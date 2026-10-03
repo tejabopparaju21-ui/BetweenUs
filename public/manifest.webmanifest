@@ -1,0 +1,57 @@
+{
+  "id": "/",
+  "name": "BetweenUs - Long-Distance Companion",
+  "short_name": "BetweenUs",
+  "description": "Private, warm, and secure digital sanctuary for couples across India to chat, share moods, track distance, and connect in real time.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "orientation": "portrait-primary",
+  "background_color": "#fff1f2",
+  "theme_color": "#f43f5e",
+  "lang": "en-IN",
+  "categories": ["lifestyle", "social"],
+  "icons": [
+    {
+      "src": "/pwa-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-maskable-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Couple Chat",
+      "short_name": "Chat",
+      "description": "Open private real-time couple chat",
+      "url": "/?tab=chat",
+      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Send Love",
+      "short_name": "Love Tap",
+      "description": "Send instant heart tap to your partner",
+      "url": "/?tab=home",
+      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
+    }
+  ]
+}

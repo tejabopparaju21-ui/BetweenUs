@@ -1,0 +1,104 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper: Check if the user is authenticated with Firebase Auth
+    function isSignedIn() {
+      return request.auth != null && request.auth.uid != null;
+    }
+
+    // Helper: Check if user is the application owner
+    function isOwnerEmail() {
+      return isSignedIn() && request.auth.token.email == 'tejabopparaju21@gmail.com';
+    }
+
+    // Helper: Check if authenticated user is a verified member of this couple
+    function isCoupleMember(cId) {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/couples/$(cId)) && (
+          isOwnerEmail() ||
+          request.auth.uid == get(/databases/$(database)/documents/couples/$(cId)).data.partnerAId ||
+          request.auth.uid == get(/databases/$(database)/documents/couples/$(cId)).data.partnerBId ||
+          (
+            get(/databases/$(database)/documents/couples/$(cId)).data.members is list &&
+            request.auth.uid in get(/databases/$(database)/documents/couples/$(cId)).data.members
+          ) ||
+          (
+            get(/databases/$(database)/documents/couples/$(cId)).data.partnerUids is list &&
+            request.auth.uid in get(/databases/$(database)/documents/couples/$(cId)).data.partnerUids
+          ) ||
+          // Ensure default/template couple space is claimable and never produces permissions lockout
+          get(/databases/$(database)/documents/couples/$(cId)).data.partnerAId == 'user_teja_1' ||
+          get(/databases/$(database)/documents/couples/$(cId)).data.partnerBId == 'user_aanya_2' ||
+          get(/databases/$(database)/documents/couples/$(cId)).data.partnerAId == '' ||
+          get(/databases/$(database)/documents/couples/$(cId)).data.partnerBId == '' ||
+          get(/databases/$(database)/documents/couples/$(cId)).data.partnerBId == null
+        );
+    }
+
+    // Couples Collection: /couples/{coupleId}
+    match /couples/{coupleId} {
+      // Allow reading couple documents for authenticated users
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+
+      // Any authenticated user can create a couple space
+      allow create: if isSignedIn();
+
+      // Existing couple members, project owner, or users claiming an open/template slot can update
+      allow update: if isSignedIn() && (
+        isOwnerEmail() ||
+        isCoupleMember(coupleId) ||
+        resource.data.partnerAId == 'user_teja_1' ||
+        resource.data.partnerBId == 'user_aanya_2' ||
+        resource.data.partnerBId == '' ||
+        resource.data.partnerBId == null ||
+        (resource.data.members is list && !(request.auth.uid in resource.data.members) && resource.data.members.size() < 2)
+      );
+
+      // Only verified couple members or owner can delete
+      allow delete: if isSignedIn() && (isOwnerEmail() || isCoupleMember(coupleId));
+
+      // Messages Subcollection: /couples/{coupleId}/messages/{messageId}
+      match /messages/{messageId} {
+        // Authenticated couple members and owner can read all messages in their space
+        allow read: if isSignedIn() && (isOwnerEmail() || isCoupleMember(coupleId));
+
+        // Authenticated couple members can send messages
+        allow create: if isSignedIn() && (isOwnerEmail() || isCoupleMember(coupleId));
+
+        // Couple members can update message read receipts, reactions, and delivery status
+        allow update: if isSignedIn() && (isOwnerEmail() || isCoupleMember(coupleId));
+
+        // Couple members can delete messages
+        allow delete: if isSignedIn() && (isOwnerEmail() || isCoupleMember(coupleId));
+      }
+
+      // Moods Subcollection: /couples/{coupleId}/moods/{moodId}
+      match /moods/{moodId} {
+        allow read, write: if isSignedIn() && (isOwnerEmail() || isCoupleMember(coupleId));
+      }
+
+      // Memories Subcollection: /couples/{coupleId}/memories/{memoryId}
+      match /memories/{memoryId} {
+        allow read, write: if isSignedIn() && (isOwnerEmail() || isCoupleMember(coupleId));
+      }
+
+      // Catch-all for any other couple subcollections
+      match /{subcollection}/{docId} {
+        allow read, write: if isSignedIn() && (isOwnerEmail() || isCoupleMember(coupleId));
+      }
+    }
+
+    // User Profiles: /users/{userId}
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && (request.auth.uid == userId || isOwnerEmail());
+    }
+
+    // Default deny catch-all for any unmapped paths
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

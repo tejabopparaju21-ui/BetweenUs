@@ -1,0 +1,247 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Background Gradients -->
+    <radialGradient id="bgGlow" cx="50%" cy="50%" r="55%">
+      <stop offset="0%" stop-color="#4a0e2e" />
+      <stop offset="45%" stop-color="#240718" />
+      <stop offset="80%" stop-color="#12030d" />
+      <stop offset="100%" stop-color="#080106" />
+    </radialGradient>
+
+    <!-- Warm Center Light -->
+    <radialGradient id="heartAura" cx="50%" cy="48%" r="40%">
+      <stop offset="0%" stop-color="#ff4d6d" stop-opacity="0.45" />
+      <stop offset="50%" stop-color="#c9184a" stop-opacity="0.2" />
+      <stop offset="100%" stop-color="#800f2f" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Hand Left Gradient (Warm Sunlit Skin) -->
+    <linearGradient id="handLeftGrad" x1="0%" y1="30%" x2="100%" y2="70%">
+      <stop offset="0%" stop-color="#fed7aa" />
+      <stop offset="40%" stop-color="#fdba74" />
+      <stop offset="75%" stop-color="#fb923c" />
+      <stop offset="100%" stop-color="#f97316" />
+    </linearGradient>
+
+    <!-- Hand Right Gradient (Tender Rose-Peach Skin) -->
+    <linearGradient id="handRightGrad" x1="100%" y1="20%" x2="0%" y2="80%">
+      <stop offset="0%" stop-color="#fce7f3" />
+      <stop offset="35%" stop-color="#fed7aa" />
+      <stop offset="70%" stop-color="#fdba74" />
+      <stop offset="100%" stop-color="#ea580c" />
+    </linearGradient>
+
+    <!-- Sleeve Left: Crimson Red Sweater -->
+    <linearGradient id="sleeveLeftGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff4d6d" />
+      <stop offset="40%" stop-color="#e11d48" />
+      <stop offset="85%" stop-color="#9f1239" />
+      <stop offset="100%" stop-color="#4c0519" />
+    </linearGradient>
+
+    <!-- Sleeve Right: Midnight Indigo Denim -->
+    <linearGradient id="sleeveRightGrad" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#60a5fa" />
+      <stop offset="35%" stop-color="#2563eb" />
+      <stop offset="75%" stop-color="#1d4ed8" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+
+    <!-- Golden Sparkle & Heart Gradient -->
+    <linearGradient id="heartGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff758f" />
+      <stop offset="45%" stop-color="#ff4d6d" />
+      <stop offset="80%" stop-color="#e11d48" />
+      <stop offset="100%" stop-color="#c9184a" />
+    </linearGradient>
+
+    <linearGradient id="goldGleam" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fef08a" />
+      <stop offset="50%" stop-color="#fbbf24" />
+      <stop offset="100%" stop-color="#f59e0b" />
+    </linearGradient>
+
+    <!-- Outer Rim Metallic Gradient -->
+    <linearGradient id="rimGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fb7185" />
+      <stop offset="30%" stop-color="#e11d48" />
+      <stop offset="60%" stop-color="#881337" />
+      <stop offset="85%" stop-color="#fb7185" />
+      <stop offset="100%" stop-color="#f43f5e" />
+    </linearGradient>
+
+    <!-- Filter for Cast Shadow -->
+    <filter id="handShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#000000" flood-opacity="0.65" />
+    </filter>
+
+    <filter id="heartGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="0" stdDeviation="10" flood-color="#ff4d6d" flood-opacity="0.8" />
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#ff758f" flood-opacity="0.9" />
+    </filter>
+
+    <!-- Circular Clip -->
+    <clipPath id="logoCircle">
+      <circle cx="256" cy="256" r="236" />
+    </clipPath>
+  </defs>
+
+  <!-- Deep Obsidian Circular Background -->
+  <circle cx="256" cy="256" r="248" fill="#080106" />
+  
+  <g clip-path="url(#logoCircle)">
+    <!-- Radial Romantic Atmosphere -->
+    <circle cx="256" cy="256" r="236" fill="url(#bgGlow)" />
+    <circle cx="256" cy="256" r="200" fill="url(#heartAura)" />
+
+    <!-- Ambient Floating Distance Starfield/Sparkles -->
+    <circle cx="120" cy="140" r="2.5" fill="#fbcfe8" opacity="0.6" />
+    <circle cx="390" cy="130" r="2" fill="#fed7aa" opacity="0.65" />
+    <circle cx="350" cy="90" r="1.5" fill="#ffffff" opacity="0.75" />
+    <circle cx="150" cy="380" r="2" fill="#fda4af" opacity="0.5" />
+    <circle cx="380" cy="370" r="2.5" fill="#fecdd3" opacity="0.6" />
+    <circle cx="256" cy="80" r="2" fill="#ffffff" opacity="0.8" />
+
+    <!-- Left Partner Sleeve (Crimson Ribbed Cuff) -->
+    <g>
+      <path d="M 0,270 L 140,240 L 155,360 L 0,390 Z" fill="url(#sleeveLeftGrad)" />
+      <path d="M 125,243 C 135,275 140,315 138,355" stroke="#4c0519" stroke-width="7" stroke-linecap="round" fill="none" />
+      <path d="M 137,240 C 147,275 152,315 150,352" stroke="#ff758f" stroke-width="4.5" stroke-linecap="round" fill="none" opacity="0.85" />
+      <path d="M 148,238 C 158,275 163,315 161,350" stroke="#fb7185" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.6" />
+    </g>
+
+    <!-- Right Partner Sleeve (Midnight Denim Cuff) -->
+    <g>
+      <path d="M 512,270 L 372,240 L 357,360 L 512,390 Z" fill="url(#sleeveRightGrad)" />
+      <path d="M 387,243 C 377,275 372,315 374,355" stroke="#0f172a" stroke-width="7" stroke-linecap="round" fill="none" />
+      <path d="M 375,240 C 365,275 360,315 362,352" stroke="#93c5fd" stroke-width="4" stroke-linecap="round" fill="none" opacity="0.85" />
+      <path d="M 364,238 C 354,275 349,315 351,350" stroke="#bfdbfe" stroke-width="2.5" stroke-linecap="round" fill="none" stroke-dasharray="6,4" opacity="0.7" />
+    </g>
+
+    <!-- ==================== HOLDING HANDS CORE ART ==================== -->
+    <g filter="url(#handShadow)">
+      
+      <!-- 1. LEFT HAND: Wrist and Palm Reaching Right -->
+      <path d="M 148,245 
+               C 180,240 210,250 235,270 
+               C 255,285 265,310 250,335 
+               C 230,360 190,355 158,345 Z" 
+            fill="url(#handLeftGrad)" 
+            stroke="#431407" stroke-width="4" stroke-linejoin="round" />
+
+      <!-- Left Thumb (Gently resting over partner's hand) -->
+      <path d="M 185,245 
+               C 200,215 225,200 255,205 
+               C 275,208 285,225 278,242 
+               C 268,260 235,268 205,260 Z" 
+            fill="url(#handLeftGrad)" 
+            stroke="#431407" stroke-width="4" stroke-linejoin="round" />
+      
+      <!-- Left Thumb Highlight -->
+      <path d="M 215,222 C 235,214 258,216 268,226" 
+            stroke="#ffffff" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.65" />
+
+      <!-- Left Hand Palm Shading -->
+      <path d="M 195,258 C 220,265 240,285 248,310" 
+            stroke="#ea580c" stroke-width="3.5" stroke-linecap="round" fill="none" opacity="0.7" />
+
+      <!-- 2. RIGHT HAND: Reaching Left and Interlocking Fingers -->
+      <path d="M 364,245 
+               C 335,240 305,250 280,270 
+               C 260,285 250,310 265,335 
+               C 285,360 325,355 354,345 Z" 
+            fill="url(#handRightGrad)" 
+            stroke="#431407" stroke-width="4" stroke-linejoin="round" />
+
+      <!-- Right Thumb -->
+      <path d="M 325,245 
+               C 310,215 285,200 258,205 
+               C 240,208 232,222 238,238 
+               C 245,250 268,262 295,260 Z" 
+            fill="url(#handRightGrad)" 
+            stroke="#431407" stroke-width="3.5" stroke-linejoin="round" />
+
+      <!-- 3. INTERTWINED FINGERS IN TENDER CLASP -->
+      <!-- Finger 1: Index Finger wrapping securely -->
+      <path d="M 292,238 
+               C 275,230 250,230 235,248 
+               C 225,260 232,275 250,278 
+               C 272,280 295,265 305,252 Z" 
+            fill="url(#handRightGrad)" 
+            stroke="#431407" stroke-width="3.5" stroke-linejoin="round" />
+      
+      <!-- Finger 2: Middle Finger clasped firmly -->
+      <path d="M 298,262 
+               C 278,255 252,256 238,275 
+               C 228,288 238,302 256,303 
+               C 278,304 300,288 310,275 Z" 
+            fill="url(#handRightGrad)" 
+            stroke="#431407" stroke-width="3.5" stroke-linejoin="round" />
+
+      <!-- Finger 3: Ring Finger nestled together -->
+      <path d="M 295,288 
+               C 278,282 256,284 244,302 
+               C 236,315 245,328 262,328 
+               C 282,328 300,312 308,300 Z" 
+            fill="url(#handRightGrad)" 
+            stroke="#431407" stroke-width="3.5" stroke-linejoin="round" />
+
+      <!-- Finger 4: Pinky Finger closing the warm hold -->
+      <path d="M 288,312 
+               C 274,308 258,310 248,325 
+               C 240,336 250,348 266,346 
+               C 282,344 296,330 302,320 Z" 
+            fill="url(#handRightGrad)" 
+            stroke="#431407" stroke-width="3.5" stroke-linejoin="round" />
+
+      <!-- Left Fingers Wrapping from Underneath to support -->
+      <path d="M 218,290 C 210,315 220,335 245,345 C 260,350 275,345 285,335" 
+            stroke="#431407" stroke-width="4" stroke-linecap="round" fill="none" />
+      
+      <!-- Knuckle Creases & Tender Skin Contours -->
+      <path d="M 270,248 C 262,246 255,250 250,256" stroke="#c2410c" stroke-width="2.5" stroke-linecap="round" fill="none" />
+      <path d="M 272,272 C 264,270 258,274 252,280" stroke="#c2410c" stroke-width="2.5" stroke-linecap="round" fill="none" />
+      <path d="M 270,296 C 262,294 256,298 252,304" stroke="#c2410c" stroke-width="2.5" stroke-linecap="round" fill="none" />
+
+      <!-- Natural Light Highlights on Knuckles -->
+      <path d="M 282,245 C 292,248 300,255 302,260" stroke="#ffffff" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.6" />
+      <path d="M 284,270 C 294,273 302,278 304,284" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" fill="none" opacity="0.55" />
+      <path d="M 280,295 C 290,298 296,303 298,308" stroke="#ffffff" stroke-width="2" stroke-linecap="round" fill="none" opacity="0.5" />
+    </g>
+
+    <!-- ==================== RADIANT CONNECTION HEART ==================== -->
+    <g transform="translate(256, 175) scale(0.95)" filter="url(#heartGlow)">
+      <path d="M 0,-18 
+               C -24,-46 -60,-22 -60,10 
+               C -60,40 -12,70 0,86 
+               C 12,70 60,40 60,10 
+               C 60,-22 24,-46 0,-18 Z" 
+            fill="url(#heartGrad)" 
+            stroke="#ffffff" stroke-width="2" />
+      
+      <path d="M -15,-15 
+               C -35,-32 -50,-10 -46,12 
+               C -42,28 -25,45 -8,58" 
+            stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" fill="none" opacity="0.75" />
+
+      <circle cx="-28" cy="-2" r="3.5" fill="#ffffff" opacity="0.85" />
+    </g>
+
+    <!-- Golden Love Sparks -->
+    <path d="M 188,170 Q 198,170 198,160 Q 198,170 208,170 Q 198,170 198,180 Q 198,170 188,170 Z" 
+          fill="url(#goldGleam)" />
+    <path d="M 305,160 Q 315,160 315,150 Q 315,160 325,160 Q 315,160 315,170 Q 315,160 305,160 Z" 
+          fill="url(#goldGleam)" />
+    <path d="M 251,268 Q 256,268 256,263 Q 256,268 261,268 Q 256,268 256,273 Q 256,268 251,268 Z" 
+          fill="#ffffff" opacity="0.9" />
+
+    <!-- Romantic Distance Constellation Lines -->
+    <path d="M 100,160 C 180,110 330,110 412,160" 
+          stroke="url(#rimGrad)" stroke-width="1.5" stroke-dasharray="4,6" fill="none" opacity="0.4" />
+  </g>
+
+  <!-- Premium Outer Rim -->
+  <circle cx="256" cy="256" r="236" fill="none" stroke="url(#rimGrad)" stroke-width="6" opacity="0.9" />
+  <circle cx="256" cy="256" r="240" fill="none" stroke="#ffffff" stroke-width="1.5" opacity="0.25" />
+  <circle cx="256" cy="256" r="248" fill="none" stroke="#000000" stroke-width="8" />
+</svg>

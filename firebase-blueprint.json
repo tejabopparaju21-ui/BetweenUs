@@ -1,0 +1,112 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "User profile with timezone, contact, and privacy flags",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string", "maxLength": 100 },
+        "email": { "type": "string", "format": "email" },
+        "avatarUrl": { "type": "string" },
+        "timeZone": { "type": "string" },
+        "city": { "type": "string" },
+        "country": { "type": "string" },
+        "anniversaryDate": { "type": "string" },
+        "sleepStartHour": { "type": "number" },
+        "sleepEndHour": { "type": "number" },
+        "shareLocation": { "type": "boolean" }
+      },
+      "required": ["id", "name", "email", "timeZone", "shareLocation"]
+    },
+    "Couple": {
+      "title": "Couple Space",
+      "description": "Shared private couple sanctuary connecting two partner IDs",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "code": { "type": "string", "maxLength": 20 },
+        "partnerAId": { "type": "string" },
+        "partnerBId": { "type": "string" },
+        "relationshipName": { "type": "string", "maxLength": 100 },
+        "anniversaryDate": { "type": "string" },
+        "nextMeetingDate": { "type": "string" },
+        "nextMeetingTitle": { "type": "string" },
+        "meetingLocation": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "code", "partnerAId", "partnerBId", "relationshipName"]
+    },
+    "Message": {
+      "title": "Chat Message",
+      "description": "Private encrypted chat message between partners",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "coupleId": { "type": "string" },
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "text": { "type": "string", "maxLength": 5000 },
+        "mediaUrl": { "type": "string" },
+        "mediaType": { "type": "string", "enum": ["image", "voice", "love_tap"] },
+        "voiceDurationSec": { "type": "number" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "coupleId", "senderId", "text", "createdAt"]
+    },
+    "Mood": {
+      "title": "Mood Entry",
+      "description": "Daily emotional check-in shared with connected partner",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "coupleId": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "moodType": { "type": "string" },
+        "note": { "type": "string", "maxLength": 500 },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["id", "coupleId", "userId", "moodType", "timestamp"]
+    },
+    "Memory": {
+      "title": "Couple Memory",
+      "description": "Shared milestone, trip, or call memorialized in timeline",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "coupleId": { "type": "string" },
+        "title": { "type": "string", "maxLength": 150 },
+        "description": { "type": "string", "maxLength": 2000 },
+        "date": { "type": "string" },
+        "mediaUrl": { "type": "string" },
+        "category": { "type": "string" },
+        "locationName": { "type": "string" },
+        "addedById": { "type": "string" }
+      },
+      "required": ["id", "coupleId", "title", "date", "category", "addedById"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Stores user profiles with private access"
+    },
+    "/couples/{coupleId}": {
+      "schema": "Couple",
+      "description": "Stores relationship details accessible only by the two partners"
+    },
+    "/couples/{coupleId}/messages/{messageId}": {
+      "schema": "Message",
+      "description": "Stores private messages inside the couple space"
+    },
+    "/couples/{coupleId}/moods/{moodId}": {
+      "schema": "Mood",
+      "description": "Stores mood logs for the couple"
+    },
+    "/couples/{coupleId}/memories/{memoryId}": {
+      "schema": "Memory",
+      "description": "Stores shared relationship milestones"
+    }
+  }
+}
