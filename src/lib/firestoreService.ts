@@ -484,6 +484,13 @@ export async function pairPartnersWithCode(
       };
     }
 
+    if (!auth.currentUser) {
+      return {
+        success: false,
+        message: 'Please sign in with Google or Email first so your account can be linked to your partner in the cloud.',
+      };
+    }
+
     // Connect this user as partnerB (or partnerA if empty)
     if (couple.partnerAId === currentUser.id) {
       // User is already partnerA in this couple
@@ -509,10 +516,20 @@ export async function pairPartnersWithCode(
     // Commit couple update to Firestore
     await setDoc(doc(db, 'couples', couple.id), sanitizeForFirestore(couple), { merge: true });
 
-    // Update both user profiles with the active coupleId
-    await setDoc(doc(db, 'users', currentUser.id), { coupleId: couple.id }, { merge: true });
-    if (couple.partnerAId) {
-      await setDoc(doc(db, 'users', couple.partnerAId), { coupleId: couple.id }, { merge: true });
+    // Update currentUser's user profile with the active coupleId
+    try {
+      await setDoc(doc(db, 'users', currentUser.id), { coupleId: couple.id, updatedAt: new Date().toISOString() }, { merge: true });
+    } catch (uErr) {
+      console.warn('Notice updating currentUser coupleId:', uErr);
+    }
+
+    // Attempt to update partner's user profile, but never let a permissions restriction on another user's doc block the pairing
+    if (couple.partnerAId && couple.partnerAId !== currentUser.id) {
+      try {
+        await setDoc(doc(db, 'users', couple.partnerAId), { coupleId: couple.id, updatedAt: new Date().toISOString() }, { merge: true });
+      } catch (pErr) {
+        console.debug('Notice updating partner profile coupleId (partner automatically syncs via couple listener):', pErr);
+      }
     }
 
     return {

@@ -24,10 +24,22 @@ export const CouplePairingView: React.FC = () => {
 
   const handleShareWhatsApp = () => {
     const appUrl = window.location.origin;
-    const text = encodeURIComponent(
-      `Hey my love! ❤️ Join me on BetweenUs so we can chat, share moods, and track distance in our private space.\n\nUse our private couple code: ${myCode}\n\nOpen BetweenUs here: ${appUrl}`
-    );
-    window.open(`https://wa.me/?text=${text}`, '_blank');
+    const message = `Hey my love! ❤️ Join me on BetweenUs so we can chat, share moods, and track distance in our private space.\n\nUse our private couple code: ${myCode}\n\nOpen BetweenUs here: ${appUrl}`;
+    const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`;
+
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      navigator.share({
+        title: 'BetweenUs Couple Space',
+        text: message,
+        url: appUrl,
+      }).catch(() => {
+        const opened = window.open(whatsappUrl, '_blank');
+        if (!opened) window.location.href = whatsappUrl;
+      });
+    } else {
+      const opened = window.open(whatsappUrl, '_blank');
+      if (!opened) window.location.href = whatsappUrl;
+    }
   };
 
   const handlePairSubmit = async (e: React.FormEvent) => {

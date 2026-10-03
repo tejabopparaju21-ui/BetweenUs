@@ -48,16 +48,15 @@ function parseValidRtdbUrl(url: unknown): string | null {
   return null;
 }
 
-// Firebase Realtime Database (optional for live GPS updates)
+// Firebase Realtime Database (optional for live GPS updates; only enabled if an instance is explicitly configured)
 let realtimeDb: Database | null = null;
 try {
   const envUrl = typeof import.meta !== 'undefined' ? import.meta.env?.VITE_FIREBASE_DATABASE_URL : null;
   const candidateUrl =
     parseValidRtdbUrl((firebaseConfig as any).databaseURL) ||
-    parseValidRtdbUrl(envUrl) ||
-    (firebaseConfig.projectId ? `https://${firebaseConfig.projectId}-default-rtdb.firebaseio.com` : null);
+    parseValidRtdbUrl(envUrl);
 
-  if (candidateUrl && parseValidRtdbUrl(candidateUrl)) {
+  if (candidateUrl) {
     realtimeDb = getDatabase(app, candidateUrl);
   }
 } catch (err) {

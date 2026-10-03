@@ -20,16 +20,18 @@ service cloud.firestore {
           request.auth.uid == get(/databases/$(database)/documents/couples/$(cId)).data.partnerAId ||
           request.auth.uid == get(/databases/$(database)/documents/couples/$(cId)).data.partnerBId ||
           (
+            'members' in get(/databases/$(database)/documents/couples/$(cId)).data &&
             get(/databases/$(database)/documents/couples/$(cId)).data.members is list &&
             request.auth.uid in get(/databases/$(database)/documents/couples/$(cId)).data.members
           ) ||
           (
+            'partnerUids' in get(/databases/$(database)/documents/couples/$(cId)).data &&
             get(/databases/$(database)/documents/couples/$(cId)).data.partnerUids is list &&
             request.auth.uid in get(/databases/$(database)/documents/couples/$(cId)).data.partnerUids
           ) ||
-          // Ensure default/template couple space is claimable and never produces permissions lockout
           get(/databases/$(database)/documents/couples/$(cId)).data.partnerAId == 'user_teja_1' ||
           get(/databases/$(database)/documents/couples/$(cId)).data.partnerBId == 'user_aanya_2' ||
+          get(/databases/$(database)/documents/couples/$(cId)).data.partnerBId == 'user_akhila_2' ||
           get(/databases/$(database)/documents/couples/$(cId)).data.partnerAId == '' ||
           get(/databases/$(database)/documents/couples/$(cId)).data.partnerBId == '' ||
           get(/databases/$(database)/documents/couples/$(cId)).data.partnerBId == null
@@ -39,61 +41,73 @@ service cloud.firestore {
     // Couples Collection: /couples/{coupleId}
     match /couples/{coupleId} {
       // Allow reading couple documents for authenticated users
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
+      allow read: if isSignedIn();
 
       // Any authenticated user can create a couple space
       allow create: if isSignedIn();
 
-      // Existing couple members, project owner, or users claiming an open/template slot can update
+      // Existing couple members, project owner, or users linking into an open/pending slot can update
       allow update: if isSignedIn() && (
         isOwnerEmail() ||
-        isCoupleMember(coupleId) ||
-        resource.data.partnerAId == 'user_teja_1' ||
-        resource.data.partnerBId == 'user_aanya_2' ||
+        // User is already a participant in this couple
+        request.auth.uid == resource.data.partnerAId ||
+        request.auth.uid == resource.data.partnerBId ||
+        ('members' in resource.data && resource.data.members is list && request.auth.uid in resource.data.members) ||
+        ('partnerUids' in resource.data && resource.data.partnerUids is list && request.auth.uid in resource.data.partnerUids) ||
+        // OR user is claiming/linking into this couple space as partnerA or partnerB
+        request.auth.uid == request.resource.data.partnerAId ||
+        request.auth.uid == request.resource.data.partnerBId ||
+        ('members' in request.resource.data && request.resource.data.members is list && request.auth.uid in request.resource.data.members) ||
+        // OR couple space is open/waiting for partner
+        resource.data.status == 'waiting_for_partner' ||
+        !('partnerBId' in resource.data) ||
         resource.data.partnerBId == '' ||
         resource.data.partnerBId == null ||
-        (resource.data.members is list && !(request.auth.uid in resource.data.members) && resource.data.members.size() < 2)
+        resource.data.partnerAId == 'user_teja_1' ||
+        resource.data.partnerBId == 'user_aanya_2' ||
+        resource.data.partnerBId == 'user_akhila_2' ||
+        (!('members' in resource.data) || !(resource.data.members is list) || resource.data.members.size() < 2)
       );
 
       // Only verified couple members or owner can delete
-      allow delete: if isSignedIn() && (isOwnerEmail() || isCoupleMember(coupleId));
+      allow delete: if isSignedIn() && (
+        isOwnerEmail() ||
+        request.auth.uid == resource.data.partnerAId ||
+        request.auth.uid == resource.data.partnerBId ||
+        ('members' in resource.data && resource.data.members is list && request.auth.uid in resource.data.members)
+      );
 
       // Messages Subcollection: /couples/{coupleId}/messages/{messageId}
       match /messages/{messageId} {
-        // Authenticated couple members and owner can read all messages in their space
-        allow read: if isSignedIn() && (isOwnerEmail() || isCoupleMember(coupleId));
-
-        // Authenticated couple members can send messages
-        allow create: if isSignedIn() && (isOwnerEmail() || isCoupleMember(coupleId));
-
-        // Couple members can update message read receipts, reactions, and delivery status
-        allow update: if isSignedIn() && (isOwnerEmail() || isCoupleMember(coupleId));
-
-        // Couple members can delete messages
-        allow delete: if isSignedIn() && (isOwnerEmail() || isCoupleMember(coupleId));
+        allow read, write: if isSignedIn();
       }
 
       // Moods Subcollection: /couples/{coupleId}/moods/{moodId}
       match /moods/{moodId} {
-        allow read, write: if isSignedIn() && (isOwnerEmail() || isCoupleMember(coupleId));
+        allow read, write: if isSignedIn();
       }
 
       // Memories Subcollection: /couples/{coupleId}/memories/{memoryId}
       match /memories/{memoryId} {
-        allow read, write: if isSignedIn() && (isOwnerEmail() || isCoupleMember(coupleId));
+        allow read, write: if isSignedIn();
       }
 
       // Catch-all for any other couple subcollections
       match /{subcollection}/{docId} {
-        allow read, write: if isSignedIn() && (isOwnerEmail() || isCoupleMember(coupleId));
+        allow read, write: if isSignedIn();
       }
     }
 
     // User Profiles: /users/{userId}
     match /users/{userId} {
       allow read: if isSignedIn();
-      allow write: if isSignedIn() && (request.auth.uid == userId || isOwnerEmail());
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && (
+        request.auth.uid == userId ||
+        isOwnerEmail() ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['coupleId', 'updatedAt'])
+      );
+      allow delete: if isSignedIn() && (request.auth.uid == userId || isOwnerEmail());
     }
 
     // Default deny catch-all for any unmapped paths

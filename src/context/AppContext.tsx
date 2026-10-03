@@ -1903,8 +1903,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (!clean || clean.length < 4) {
         return { success: false, message: 'Invalid couple code format. Example: PAIR-4821' };
       }
-      if (!currentUser.id) {
-        return { success: false, message: 'Please sign in first with Google to join a couple space.' };
+      if (!firebaseUser) {
+        return { success: false, message: 'Please sign in with Google or Email first to link your account with your partner in the cloud.' };
       }
       setIsChatSyncing(true);
       try {

@@ -34,6 +34,7 @@ import {
   Download,
   Sparkles,
   Smartphone,
+  Share2,
 } from 'lucide-react';
 import { readFileAsDataUrl } from '../utils/fileUtils';
 import { INDIAN_CITIES, INDIAN_HOURS_12H, findIndianCity } from '../utils/indianCities';
@@ -153,6 +154,27 @@ export const SettingsSection: React.FC = () => {
       navigator.clipboard.writeText(codeToCopy);
       setCopiedCode(true);
       setTimeout(() => setCopiedCode(false), 2000);
+    }
+  };
+
+  const handleShareWhatsApp = () => {
+    const code = currentUser.coupleCode || couple?.code || 'PAIR-LOVE';
+    const appUrl = window.location.origin;
+    const message = `Hey! ❤️ Connect with me on BetweenUs — our private couples space for live chat, mood sharing, and distance tracking.\n\nOur private couple code: ${code}\n\nOpen app: ${appUrl}`;
+    const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`;
+
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      navigator.share({
+        title: 'BetweenUs Couple Invitation',
+        text: message,
+        url: appUrl,
+      }).catch(() => {
+        const opened = window.open(whatsappUrl, '_blank');
+        if (!opened) window.location.href = whatsappUrl;
+      });
+    } else {
+      const opened = window.open(whatsappUrl, '_blank');
+      if (!opened) window.location.href = whatsappUrl;
     }
   };
 
