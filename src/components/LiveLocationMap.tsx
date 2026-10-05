@@ -353,7 +353,7 @@ export const LiveLocationMap: React.FC<LiveLocationMapProps> = () => {
   }
 
   return (
-    <div className="relative rounded-3xl bg-white border border-rose-100 shadow-xl overflow-hidden flex flex-col">
+    <div className="relative rounded-3xl bg-white/95 backdrop-blur-md border border-white/80 shadow-xl overflow-hidden flex flex-col">
       {/* Top Header Bar */}
       <div className="p-4 bg-gradient-to-r from-rose-50/90 via-pink-50/80 to-indigo-50/90 border-b border-rose-100 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">

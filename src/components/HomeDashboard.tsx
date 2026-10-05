@@ -58,6 +58,7 @@ export const HomeDashboard: React.FC = () => {
   const [selectedMoodNote, setSelectedMoodNote] = useState('');
   const [selectedMoodType, setSelectedMoodType] = useState<MoodType>('loved');
   const [showLocationDialog, setShowLocationDialog] = useState(false);
+  const [peekWallpaper, setPeekWallpaper] = useState(false);
 
   // Update clock every second for live IST timing
   useEffect(() => {
@@ -137,11 +138,56 @@ export const HomeDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Hero Couple Avatars & Distance Header */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-b from-rose-500 via-rose-600 to-pink-600 p-6 text-white shadow-xl shadow-rose-500/20">
-        {/* Soft background glow circles */}
-        <div className="absolute -top-12 -right-12 w-48 h-48 rounded-full bg-white/10 blur-2xl" />
-        <div className="absolute -bottom-10 -left-10 w-44 h-44 rounded-full bg-pink-400/20 blur-xl" />
+      {/* Floating Wallpaper Peek Overlay & Tap to Return Indicator */}
+      {peekWallpaper && (
+        <div
+          onClick={() => setPeekWallpaper(false)}
+          className="fixed inset-0 z-30 cursor-pointer flex flex-col justify-between items-center py-12 px-4 animate-in fade-in duration-300"
+        >
+          <div className="bg-black/60 hover:bg-black/75 backdrop-blur-md text-white text-xs font-bold px-4 py-2 rounded-full border border-white/30 shadow-xl flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-amber-300 animate-spin" style={{ animationDuration: '6s' }} />
+            <span>Viewing Full Wallpaper • Tap anywhere to restore dashboard</span>
+          </div>
+          <div className="bg-black/55 backdrop-blur-md text-rose-100 text-xs font-semibold px-4 py-1.5 rounded-full border border-white/20 shadow-md">
+            Holding hands across the distance ❤️
+          </div>
+        </div>
+      )}
+
+      {/* Top Wallpaper View Action Header */}
+      <div className="flex items-center justify-between px-1">
+        <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 bg-white/75 backdrop-blur-md px-3 py-1 rounded-full border border-white/80 shadow-xs">
+          <Heart className="w-3.5 h-3.5 text-rose-500 fill-rose-500 animate-pulse" />
+          <span>Home of {couple?.relationshipName || `${currentUser.name} & ${partnerUser.name}`}</span>
+        </div>
+        <button
+          type="button"
+          onClick={() => setPeekWallpaper(!peekWallpaper)}
+          className="text-xs font-bold text-slate-800 bg-white/75 hover:bg-white/95 backdrop-blur-md px-3 py-1 rounded-full border border-white/80 shadow-xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer"
+          title="Toggle unobstructed view of background wallpaper"
+        >
+          <Eye className="w-3.5 h-3.5 text-rose-500" />
+          <span>{peekWallpaper ? 'Show Dashboard' : 'View Wallpaper'}</span>
+        </button>
+      </div>
+
+      {/* Main Home Dashboard Cards with Smooth Peek Transition */}
+      <div className={`space-y-5 transition-all duration-300 ${peekWallpaper ? 'opacity-0 pointer-events-none scale-95' : 'opacity-100 scale-100'}`}>
+        {/* Hero Couple Avatars & Distance Header */}
+        <div className="relative overflow-hidden rounded-3xl p-6 text-white shadow-2xl shadow-rose-950/25 border border-white/30 backdrop-blur-xl">
+          {/* Ambient holding-hands art backdrop */}
+          <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+            <img
+              src="/home-bg.jpg"
+              alt="Holding Hands Background"
+              className="w-full h-full object-cover object-[center_35%] filter brightness-90 saturate-110"
+            />
+            <div className="absolute inset-0 bg-gradient-to-b from-rose-950/85 via-rose-900/80 to-pink-950/85 backdrop-blur-[1px]" />
+          </div>
+
+          {/* Soft background glow circles */}
+          <div className="absolute -top-12 -right-12 w-48 h-48 rounded-full bg-white/10 blur-2xl z-0" />
+          <div className="absolute -bottom-10 -left-10 w-44 h-44 rounded-full bg-pink-400/20 blur-xl z-0" />
 
         <div className="relative z-10 text-center">
           <div className="text-xs font-semibold tracking-wider uppercase text-rose-100 flex items-center justify-center gap-1.5 mb-2">
@@ -247,11 +293,11 @@ export const HomeDashboard: React.FC = () => {
       {/* Indian Standard Time (IST) & Dual City Timing Cards */}
       <div className="space-y-3">
         <div className="flex items-center justify-between px-1">
-          <span className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-800 bg-white/70 backdrop-blur-md px-3 py-1 rounded-full border border-white/80 shadow-2xs flex items-center gap-1.5">
             <Clock className="w-3.5 h-3.5 text-rose-500 animate-spin" style={{ animationDuration: '60s' }} />
             <span>Timings for Both • Indian Standard Time (IST)</span>
           </span>
-          <span className="text-[11px] font-bold text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200 shadow-2xs">
+          <span className="text-[11px] font-bold text-emerald-800 bg-emerald-50/90 backdrop-blur-xs px-2.5 py-0.5 rounded-full border border-emerald-200 shadow-2xs">
             UTC +05:30 (IST)
           </span>
         </div>
@@ -259,7 +305,7 @@ export const HomeDashboard: React.FC = () => {
         {/* Live Synchronized Dual Clocks */}
         <div className="grid grid-cols-2 gap-3">
           {/* Your Live Time Card */}
-          <div className="bg-white rounded-2xl p-4 shadow-sm border border-rose-100/80 relative overflow-hidden group hover:border-rose-300 transition">
+          <div className="bg-white/90 backdrop-blur-md rounded-2xl p-4 shadow-sm border border-white/80 relative overflow-hidden group hover:border-rose-300 transition">
             <div className="flex items-center justify-between text-slate-400 text-xs font-semibold mb-1">
               <span className="text-slate-800 font-extrabold flex items-center gap-1 truncate">
                 <span>{currentUser.name}</span>
@@ -292,7 +338,7 @@ export const HomeDashboard: React.FC = () => {
           </div>
 
           {/* Partner Live Time Card */}
-          <div className="bg-white rounded-2xl p-4 shadow-sm border border-rose-100/80 relative overflow-hidden group hover:border-rose-300 transition">
+          <div className="bg-white/90 backdrop-blur-md rounded-2xl p-4 shadow-sm border border-white/80 relative overflow-hidden group hover:border-rose-300 transition">
             <div className="flex items-center justify-between text-slate-400 text-xs font-semibold mb-1">
               <span className="text-slate-800 font-extrabold flex items-center gap-1 truncate">
                 <span>{partnerUser.name}</span>
@@ -326,10 +372,10 @@ export const HomeDashboard: React.FC = () => {
         </div>
 
         {/* Both Status Overview Banner */}
-        <div className={`p-2.5 rounded-2xl text-xs font-semibold flex items-center justify-between gap-2 border ${
+        <div className={`p-2.5 rounded-2xl text-xs font-semibold flex items-center justify-between gap-2 border backdrop-blur-xs ${
           !userSleeping && !partnerSleeping
-            ? 'bg-emerald-50/90 border-emerald-200 text-emerald-800'
-            : 'bg-indigo-50/90 border-indigo-200 text-indigo-800'
+            ? 'bg-emerald-50/90 border-emerald-200/80 text-emerald-800'
+            : 'bg-indigo-50/90 border-indigo-200/80 text-indigo-800'
         }`}>
           <div className="flex items-center gap-1.5 truncate">
             <span>{!userSleeping && !partnerSleeping ? '✨' : '🌙'}</span>
@@ -341,7 +387,7 @@ export const HomeDashboard: React.FC = () => {
                 : `${currentUser.name} is in sleep hours 🌙`}
             </span>
           </div>
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/80 border shrink-0">
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/90 border shrink-0">
             IST • India
           </span>
         </div>
@@ -351,13 +397,13 @@ export const HomeDashboard: React.FC = () => {
         {(() => {
           const indianRhythm = getIndianDailyRhythm(new Date());
           return (
-            <div className="bg-gradient-to-r from-amber-50/80 via-rose-50/80 to-pink-50/80 rounded-2xl p-3.5 border border-rose-200/70 shadow-xs text-xs">
+            <div className="bg-gradient-to-r from-amber-50/90 via-rose-50/90 to-pink-50/90 backdrop-blur-md rounded-2xl p-3.5 border border-white/80 shadow-xs text-xs">
               <div className="flex items-center justify-between mb-1.5">
                 <div className="flex items-center gap-1.5">
                   <span className="text-base">{indianRhythm.emoji}</span>
                   <span className="font-extrabold text-slate-800 text-xs">{indianRhythm.phase}</span>
                 </div>
-                <span className="text-[10px] font-bold text-rose-600 bg-white/80 px-2 py-0.5 rounded-full border border-rose-200">
+                <span className="text-[10px] font-bold text-rose-600 bg-white/90 px-2 py-0.5 rounded-full border border-rose-200">
                   {indianRhythm.timeRange}
                 </span>
               </div>
@@ -380,7 +426,7 @@ export const HomeDashboard: React.FC = () => {
       </div>
 
       {/* Send Love Quick Interaction Bar */}
-      <div className="bg-white rounded-3xl p-4 shadow-sm border border-rose-100">
+      <div className="bg-white/90 backdrop-blur-md rounded-3xl p-4 shadow-sm border border-white/80">
         <div className="flex items-center justify-between mb-3 px-1">
           <span className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
             <Flame className="w-4 h-4 text-rose-500" />
@@ -416,7 +462,7 @@ export const HomeDashboard: React.FC = () => {
       </div>
 
       {/* Countdown to Next Meeting */}
-      <div className="bg-gradient-to-r from-pink-500 via-rose-500 to-rose-600 rounded-3xl p-5 text-white shadow-lg shadow-rose-500/15 relative overflow-hidden">
+      <div className="bg-gradient-to-r from-pink-600/95 via-rose-600/90 to-rose-700/95 backdrop-blur-md rounded-3xl p-5 text-white shadow-xl shadow-rose-950/20 border border-white/20 relative overflow-hidden">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center">
@@ -459,7 +505,7 @@ export const HomeDashboard: React.FC = () => {
       </div>
 
       {/* Today's Mood & Emotional Connection Card */}
-      <div className="bg-white rounded-3xl p-5 shadow-sm border border-rose-100">
+      <div className="bg-white/90 backdrop-blur-md rounded-3xl p-5 shadow-sm border border-white/80">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
             <span>💭</span>
@@ -572,7 +618,7 @@ export const HomeDashboard: React.FC = () => {
       {lastMessage && (
         <div
           onClick={() => setActiveTab('chat')}
-          className="bg-white rounded-3xl p-4 shadow-sm border border-rose-100 flex items-center justify-between gap-3 cursor-pointer hover:border-rose-200 transition"
+          className="bg-white/90 backdrop-blur-md rounded-3xl p-4 shadow-sm border border-white/80 flex items-center justify-between gap-3 cursor-pointer hover:border-rose-200 transition"
         >
           <div className="flex items-center gap-3 overflow-hidden">
             <div className="w-10 h-10 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
@@ -596,7 +642,7 @@ export const HomeDashboard: React.FC = () => {
       )}
 
       {/* Today's Connection Prompt / AI Spotlight */}
-      <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/70 rounded-3xl p-4">
+      <div className="bg-gradient-to-r from-amber-50/90 to-orange-50/90 backdrop-blur-md border border-amber-200/70 rounded-3xl p-4 shadow-xs">
         <div className="flex items-start gap-3">
           <div className="w-9 h-9 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 mt-0.5">
             <Sparkles className="w-5 h-5" />
@@ -623,7 +669,7 @@ export const HomeDashboard: React.FC = () => {
       {recentMemory && (
         <div
           onClick={() => setActiveTab('memories')}
-          className="bg-white rounded-3xl overflow-hidden shadow-sm border border-rose-100 cursor-pointer hover:border-rose-200 transition"
+          className="bg-white/90 backdrop-blur-md rounded-3xl overflow-hidden shadow-sm border border-white/80 cursor-pointer hover:border-rose-200 transition"
         >
           <div className="p-4 flex items-center justify-between border-b border-slate-50">
             <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
@@ -657,7 +703,7 @@ export const HomeDashboard: React.FC = () => {
       )}
 
       {/* Live Location Access for Both Partners Card */}
-      <div className="p-4 rounded-3xl bg-white border border-rose-100 shadow-sm space-y-3">
+      <div className="p-4 rounded-3xl bg-white/90 backdrop-blur-md border border-white/80 shadow-sm space-y-3">
         <div className="flex items-center justify-between pb-2 border-b border-rose-50">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-rose-500 to-pink-600 flex items-center justify-center text-white shadow-xs">
@@ -734,6 +780,7 @@ export const HomeDashboard: React.FC = () => {
             </button>
           </div>
         </div>
+      </div>
       </div>
 
       {/* Live Location Access Modal Instance */}

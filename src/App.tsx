@@ -33,7 +33,27 @@ function MainAppContent() {
 
   // 3. Either paired with partner or exploring in Demo Mode -> Display Main App
   return (
-    <div className="min-h-screen bg-gradient-to-b from-rose-50/50 via-white to-pink-50/30 flex flex-col">
+    <div
+      className={`min-h-screen flex flex-col relative transition-colors duration-500 ${
+        activeTab === 'home'
+          ? 'bg-slate-900/10'
+          : 'bg-gradient-to-b from-rose-50/50 via-white to-pink-50/30'
+      }`}
+    >
+      {/* Home Page Romantic Holding Hands Background Art */}
+      {activeTab === 'home' && (
+        <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden" aria-hidden="true">
+          <img
+            src="/home-bg.jpg"
+            alt="BetweenUs Home Background"
+            className="w-full h-full object-cover object-center scale-100 filter contrast-[1.02] brightness-[0.98] transition-opacity duration-700"
+          />
+          {/* Subtle soft gradient & atmospheric tint so text and cards remain 100% crisp and readable */}
+          <div className="absolute inset-0 bg-gradient-to-b from-slate-950/40 via-rose-950/20 to-slate-950/50" />
+          <div className="absolute inset-0 bg-white/15 backdrop-blur-[1px]" />
+        </div>
+      )}
+
       {/* Demo Mode Notice Banner */}
       {isDemoMode && (
         <div className="bg-gradient-to-r from-amber-500 via-rose-500 to-pink-500 text-white px-4 py-2 text-xs font-bold flex items-center justify-between shadow-xs sticky top-0 z-40">
@@ -54,7 +74,7 @@ function MainAppContent() {
       <EmergencyAlertModal />
       <Navigation />
 
-      <main className="flex-1 w-full max-w-lg mx-auto">
+      <main className="flex-1 w-full max-w-lg mx-auto relative z-10">
         {activeTab === 'home' && <HomeDashboard />}
         {activeTab === 'chat' && <CoupleChat />}
         {activeTab === 'connect' && <ConnectSection />}

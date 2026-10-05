@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Heart, Sparkles, Mail, Lock, AlertCircle, ArrowRight, ShieldCheck, MapPin, MessageCircleHeart } from 'lucide-react';
+import { Heart, Sparkles, Mail, Lock, AlertCircle, ArrowRight, ShieldCheck, MapPin, MessageCircleHeart, ExternalLink } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import firebaseConfig from '../../firebase-applet-config.json';
 
 export const AuthScreen: React.FC = () => {
   const { loginWithGoogle, loginWithEmail, registerWithEmail, enterDemoMode } = useApp();
@@ -103,10 +104,41 @@ export const AuthScreen: React.FC = () => {
       {/* Main Auth Actions Container */}
       <div className="w-full max-w-md mx-auto my-6 bg-white/90 backdrop-blur-md rounded-3xl p-6 sm:p-7 border border-rose-100 shadow-xl shadow-rose-100/50">
         {error && (
-          <div className="mb-4 p-3 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-start gap-2 animate-in fade-in">
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-            <div className="flex-1 font-medium">{error}</div>
-          </div>
+          error.includes('unauthorized-domain') ? (
+            <div className="mb-5 p-4 rounded-2xl bg-amber-50/90 border border-amber-200 text-amber-950 text-xs space-y-2.5 animate-in fade-in shadow-xs">
+              <div className="flex items-center gap-2 font-bold text-amber-900">
+                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>Domain Not Authorized in Firebase</span>
+              </div>
+              <p className="text-[11px] text-amber-800 leading-relaxed">
+                Google Sign-In requires <code className="bg-amber-100/80 px-1.5 py-0.5 rounded font-mono font-bold text-amber-900">localhost</code> to be added to Authorized Domains in your Firebase Authentication Settings.
+              </p>
+              <div className="flex flex-col gap-2 pt-1">
+                <a
+                  href={`https://console.firebase.google.com/project/${firebaseConfig.projectId}/authentication/settings`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-xs transition"
+                >
+                  <span>Add localhost in Firebase Console</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+                <button
+                  type="button"
+                  onClick={enterDemoMode}
+                  className="w-full inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 font-bold text-xs transition cursor-pointer"
+                >
+                  <span>Explore App in Demo Mode Now</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="mb-4 p-3 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-start gap-2 animate-in fade-in">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <div className="flex-1 font-medium">{error}</div>
+            </div>
+          )
         )}
 
         {/* Google Primary Button */}
