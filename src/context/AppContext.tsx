@@ -59,6 +59,7 @@ import {
   LiveLocationRecord,
 } from '../lib/realtimeLocationService';
 import { findClosestIndianCity, findIndianCity, INDIAN_CITIES } from '../utils/indianCities';
+import { getCallDeviceSessionId, isCallStale } from '../utils/callSessionHelper';
 import type { User as FirebaseUser } from 'firebase/auth';
 import firebaseConfig from '../../firebase-applet-config.json';
 
@@ -846,7 +847,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // Active Call Session synchronization from cloud couple doc
         if ((cloudCouple as any).activeCall !== undefined) {
           const cloudCall = (cloudCouple as any).activeCall as CallSession | null;
-          setActiveCall(cloudCall);
+          if (cloudCall && isCallStale(cloudCall)) {
+            // Clean up stale or expired call in Firestore so it doesn't linger
+            syncActiveCallToFirestore(couple.id, null);
+            setActiveCall(null);
+          } else {
+            setActiveCall(cloudCall);
+          }
         }
       }
     });
@@ -900,7 +907,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (parsed.sharedNotes) setSharedNotes(parsed.sharedNotes);
           if (parsed.surprises) setSurprises(parsed.surprises);
           if (parsed.gameSession !== undefined) setGameSession(parsed.gameSession);
-          if (parsed.activeCall !== undefined) setActiveCall(parsed.activeCall);
+          if (parsed.activeCall !== undefined) {
+            if (parsed.activeCall && isCallStale(parsed.activeCall)) {
+              setActiveCall(null);
+            } else {
+              setActiveCall(parsed.activeCall);
+            }
+          }
         } catch (err) {
           console.debug('Storage sync notice:', err);
         }
@@ -940,7 +953,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } else if (type === 'EMERGENCY_SOS_TRIGGERED' || type === 'EMERGENCY_SOS_ACKNOWLEDGED' || type === 'EMERGENCY_SOS_CANCELLED') {
         setActiveEmergencyAlert(payload);
       } else if (type === 'CALL_UPDATE') {
-        setActiveCall(payload);
+        if (payload && isCallStale(payload)) {
+          setActiveCall(null);
+        } else {
+          setActiveCall(payload);
+        }
       }
     };
 
@@ -2103,9 +2120,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const startCall = useCallback(
     async (mode: 'voice' | 'video') => {
       const callId = `call_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+      const mySessionId = getCallDeviceSessionId();
       const newCall: CallSession = {
         id: callId,
         coupleId: couple?.id || 'demo_couple',
+        callerDeviceId: mySessionId,
         callerId: currentUser.id,
         callerName: currentUser.name,
         callerAvatar: currentUser.avatarUrl,
@@ -2137,7 +2156,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   );
 
   const acceptIncomingCall = useCallback(async () => {
-    if (!activeCall) return;
+    // Only permit explicit answering when status is actively ringing
+    if (!activeCall || activeCall.status !== 'ringing') return;
     const updated: CallSession = {
       ...activeCall,
       status: 'connected',
@@ -2284,6 +2304,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     },
     [activeCall, updateCallSession]
   );
+
+  // Auto-timeout unanswered calls after 45 seconds (prevents indefinite ringing)
+  useEffect(() => {
+    if (!activeCall || activeCall.status !== 'ringing') return;
+    const timeout = window.setTimeout(() => {
+      endActiveCall();
+    }, 45000);
+    return () => clearTimeout(timeout);
+  }, [activeCall?.id, activeCall?.status, endActiveCall]);
+
+  // Clean up active call on window/tab close so it never lingers in Firestore
+  useEffect(() => {
+    const handleClose = () => {
+      if (activeCall && couple?.id) {
+        syncActiveCallToFirestore(couple.id, null);
+      }
+    };
+    window.addEventListener('beforeunload', handleClose);
+    window.addEventListener('pagehide', handleClose);
+    return () => {
+      window.removeEventListener('beforeunload', handleClose);
+      window.removeEventListener('pagehide', handleClose);
+    };
+  }, [activeCall, couple?.id]);
 
   // Reset to default sample data
   const resetAllDemoData = useCallback(() => {

@@ -73,6 +73,7 @@ export interface Couple {
 export interface CallSession {
   id: string;
   coupleId: string;
+  callerDeviceId?: string;
   callerId: string;
   callerName: string;
   callerAvatar?: string;

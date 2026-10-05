@@ -28,6 +28,7 @@ import {
 } from '../utils/callAudio';
 import { getAudioContext } from '../utils/audioNotes';
 import { formatISTTime } from '../utils/indianCities';
+import { getCallDeviceSessionId, resolveCallRole, isCallStale } from '../utils/callSessionHelper';
 
 interface FloatingHeart {
   id: number;
@@ -78,10 +79,25 @@ export const CallModal: React.FC = () => {
   const offerCreatedRef = useRef<boolean>(false);
   const answerCreatedRef = useRef<boolean>(false);
 
-  const isCaller = activeCall?.callerId === currentUser.id;
-  const isRecipient = activeCall?.recipientId === currentUser.id;
+  const mySessionId = useMemo(() => getCallDeviceSessionId(), []);
+  const myUid = currentUser.id || '';
+
+  // 100% reliable 2-device role resolution:
+  // - Device that initiated the call is ALWAYS the caller
+  // - Other device receiving the call is ALWAYS the recipient (shows Lift/Accept button!)
+  const { isCaller, isRecipient } = useMemo(() => {
+    return resolveCallRole(activeCall, myUid, mySessionId);
+  }, [activeCall, myUid, mySessionId]);
+
   const mode = activeCall?.mode || 'voice';
   const status = activeCall?.status || 'ended';
+
+  // Safeguard: Automatically dismiss stale lingering calls so they never auto-lift
+  useEffect(() => {
+    if (activeCall && isCallStale(activeCall)) {
+      endActiveCall();
+    }
+  }, [activeCall, endActiveCall]);
 
   // Format seconds into MM:SS
   const formatDuration = (secs: number) => {
@@ -508,10 +524,13 @@ export const CallModal: React.FC = () => {
           {/* Accept / Decline Action Buttons */}
           <div className="flex items-center justify-around w-full mt-8 gap-6">
             {/* Decline Button */}
-            <div className="flex flex-col items-center gap-1.5">
+            <div className="flex flex-col items-center gap-2">
               <button
                 type="button"
-                onClick={declineIncomingCall}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  declineIncomingCall();
+                }}
                 className="w-16 h-16 rounded-full bg-gradient-to-tr from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white flex items-center justify-center shadow-xl shadow-red-600/40 transition active:scale-90 cursor-pointer tap-bounce"
                 title="Decline Call"
               >
@@ -520,17 +539,25 @@ export const CallModal: React.FC = () => {
               <span className="text-xs font-bold text-slate-300">Decline</span>
             </div>
 
-            {/* Accept Button */}
-            <div className="flex flex-col items-center gap-1.5">
-              <button
-                type="button"
-                onClick={acceptIncomingCall}
-                className="w-16 h-16 rounded-full bg-gradient-to-tr from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white flex items-center justify-center shadow-xl shadow-emerald-500/40 transition active:scale-90 cursor-pointer tap-bounce animate-bounce"
-                title="Accept Call"
-              >
-                <PhoneCall className="w-7 h-7" />
-              </button>
-              <span className="text-xs font-bold text-emerald-300">Accept</span>
+            {/* Accept / Lift Call Button */}
+            <div className="flex flex-col items-center gap-2">
+              <div className="relative">
+                <div className="absolute -inset-2.5 rounded-full bg-emerald-500/35 animate-ping pointer-events-none" />
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    acceptIncomingCall();
+                  }}
+                  className="relative z-10 w-20 h-20 rounded-full bg-gradient-to-tr from-emerald-500 via-teal-500 to-emerald-400 hover:from-emerald-600 hover:to-teal-600 text-white flex items-center justify-center shadow-2xl shadow-emerald-500/60 ring-4 ring-emerald-400/50 transition active:scale-90 cursor-pointer tap-bounce animate-bounce"
+                  title="Lift Call"
+                >
+                  <PhoneCall className="w-9 h-9" />
+                </button>
+              </div>
+              <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-extrabold text-xs tracking-wide border border-emerald-500/30">
+                Lift / Accept
+              </span>
             </div>
           </div>
         </div>
@@ -956,13 +983,18 @@ export const CallModal: React.FC = () => {
           </button>
 
           {/* End Call / Cancel Button */}
-          <button
-            onClick={endActiveCall}
-            className="w-14 h-14 rounded-full bg-gradient-to-tr from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white flex items-center justify-center shadow-xl shadow-red-600/40 transition active:scale-90 cursor-pointer tap-bounce"
-            title="End call"
-          >
-            <PhoneOff className="w-6 h-6" />
-          </button>
+          <div className="flex flex-col items-center">
+            <button
+              onClick={endActiveCall}
+              className="w-14 h-14 rounded-full bg-gradient-to-tr from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white flex items-center justify-center shadow-xl shadow-red-600/40 transition active:scale-90 cursor-pointer tap-bounce"
+              title={status === 'ringing' ? 'Cancel Call' : 'End Call'}
+            >
+              <PhoneOff className="w-6 h-6" />
+            </button>
+            <span className="text-[9px] mt-0.5 font-bold text-red-300">
+              {status === 'ringing' ? 'Cancel' : 'End'}
+            </span>
+          </div>
         </div>
       </div>
     </div>
