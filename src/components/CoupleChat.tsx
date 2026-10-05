@@ -305,10 +305,10 @@ export const CoupleChat: React.FC = () => {
   const quickEmojis = ['❤️', '🥰', '😘', '🤗', '🌹', '✨', '🥺', '😭', '🔥', '☕', '🥐', '✈️'];
 
   return (
-    <div className="max-w-md mx-auto flex flex-col h-[calc(100vh-130px)] bg-slate-50/50">
+    <div className="w-full max-w-full sm:max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto flex flex-col h-[calc(100dvh-120px)] sm:h-[calc(100vh-140px)] bg-slate-50/70 sm:rounded-3xl sm:border border-rose-100 sm:shadow-md sm:my-2 overflow-hidden transition-all">
       {/* Chat Sub-header */}
-      <div className="bg-white px-4 py-2.5 border-b border-rose-100 flex items-center justify-between shadow-xs shrink-0">
-        <div className="flex items-center gap-2.5">
+      <div className="bg-white/95 backdrop-blur-md px-3.5 sm:px-5 py-2.5 border-b border-rose-100 flex items-center justify-between shadow-xs shrink-0 z-10">
+        <div className="flex items-center gap-2.5 min-w-0">
           <div className="relative">
             <img
               src={partnerUser.avatarUrl}
@@ -834,12 +834,12 @@ export const CoupleChat: React.FC = () => {
       ) : (
         <form
           onSubmit={handleSendText}
-          className="bg-white p-3 border-t border-rose-100 flex items-center gap-2 shrink-0"
+          className="bg-white/95 backdrop-blur-md px-2.5 sm:px-4 py-2 sm:py-3 border-t border-rose-100 flex items-center gap-1 sm:gap-2 shrink-0 z-20"
         >
           <button
             type="button"
             onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-            className={`p-2 rounded-xl transition ${
+            className={`w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center rounded-xl transition cursor-pointer tap-bounce ${
               showEmojiPicker ? 'bg-rose-100 text-rose-600' : 'text-slate-400 hover:text-rose-600'
             }`}
             title="Emojis"
@@ -849,7 +849,7 @@ export const CoupleChat: React.FC = () => {
 
           {/* Photo/Video Picker Button */}
           <label
-            className="p-2 rounded-xl text-slate-400 hover:text-rose-600 transition cursor-pointer"
+            className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center rounded-xl text-slate-400 hover:text-rose-600 transition cursor-pointer tap-bounce"
             title="Share photo or video"
           >
             <Camera className="w-5 h-5" />
@@ -870,7 +870,6 @@ export const CoupleChat: React.FC = () => {
                     console.error(err);
                   }
                 }
-                // Reset input so re-selecting same file triggers change
                 e.target.value = '';
               }}
             />
@@ -879,8 +878,8 @@ export const CoupleChat: React.FC = () => {
           <button
             type="button"
             onClick={isRecordingVoice ? stopAndSendVoiceRecording : startVoiceRecording}
-            className={`p-2 rounded-xl transition ${
-              isRecordingVoice ? 'bg-red-500 text-white' : 'text-slate-400 hover:text-rose-600'
+            className={`w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center rounded-xl transition cursor-pointer tap-bounce ${
+              isRecordingVoice ? 'bg-red-500 text-white animate-pulse' : 'text-slate-400 hover:text-rose-600'
             }`}
             title="Voice Note"
           >
@@ -891,14 +890,14 @@ export const CoupleChat: React.FC = () => {
             type="text"
             value={inputVal}
             onChange={(e) => setInputVal(e.target.value)}
-            placeholder={`Message as ${currentUser.name} to ${partnerUser.name}...`}
-            className="flex-1 bg-slate-100 text-sm px-4 py-2.5 rounded-2xl focus:outline-none focus:ring-2 focus:ring-rose-400"
+            placeholder={`Message as ${currentUser.name}...`}
+            className="flex-1 min-w-0 bg-slate-100/90 text-xs sm:text-sm px-3.5 py-2.5 rounded-2xl focus:outline-none focus:ring-2 focus:ring-rose-400 focus:bg-white transition border border-transparent placeholder:text-slate-400"
           />
 
           <button
             type="submit"
             disabled={!inputVal.trim() || isSending}
-            className="p-2.5 rounded-2xl bg-rose-600 hover:bg-rose-700 disabled:opacity-40 text-white shadow-xs transition active:scale-95 flex items-center justify-center min-w-[38px] min-h-[38px]"
+            className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 disabled:opacity-35 text-white shadow-xs transition active:scale-95 flex items-center justify-center shrink-0 cursor-pointer tap-bounce"
             title={isSending ? 'Sending to cloud...' : 'Send message'}
           >
             {isSending ? (

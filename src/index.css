@@ -53,10 +53,28 @@
 
 /* Safe area insets for mobile devices */
 .pb-safe {
-  padding-bottom: env(safe-area-inset-bottom, 1rem);
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 0.75rem);
 }
 .pt-safe {
-  padding-top: env(safe-area-inset-top, 0.5rem);
+  padding-top: max(env(safe-area-inset-top, 0px), 0.5rem);
+}
+
+/* Hide scrollbar for clean horizontal tabs */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Touch feedback helper */
+.tap-bounce {
+  transition: transform 0.12s ease-out, opacity 0.12s ease-out;
+}
+.tap-bounce:active {
+  transform: scale(0.97);
+  opacity: 0.92;
 }
 
 /* Leaflet custom map markers and tooltips */

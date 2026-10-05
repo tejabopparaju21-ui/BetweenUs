@@ -150,42 +150,42 @@ export const AICompanion: React.FC = () => {
   };
 
   return (
-    <div className="max-w-md mx-auto px-4 py-5 space-y-5 pb-24">
+    <div className="w-full max-w-md md:max-w-3xl lg:max-w-4xl mx-auto px-3.5 sm:px-5 py-4 sm:py-6 space-y-4 sm:space-y-5 pb-24">
       {/* Header Banner */}
-      <div className="bg-gradient-to-r from-amber-500 via-rose-500 to-pink-500 rounded-3xl p-5 text-white shadow-lg shadow-rose-500/15 relative overflow-hidden">
+      <div className="bg-gradient-to-r from-amber-500 via-rose-500 to-pink-500 rounded-[24px] p-4 sm:p-5 text-white shadow-lg shadow-rose-500/15 relative overflow-hidden">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-xs flex items-center justify-center shrink-0">
-            <Sparkles className="w-6 h-6 text-white" />
+          <div className="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center shrink-0 shadow-inner">
+            <Sparkles className="w-5 h-5 text-white" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-xl font-black tracking-tight">Love Companion</h2>
-              <span className="text-[10px] bg-white/25 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+              <h2 className="text-lg sm:text-xl font-black tracking-tight">Love Companion</h2>
+              <span className="text-[9px] bg-white/25 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
                 Supportive AI
               </span>
             </div>
             <p className="text-xs text-rose-100 font-medium mt-0.5">
-              Thoughtful ideas to nurture your real connection across the distance
+              Thoughtful ideas to nurture your connection across the distance
             </p>
           </div>
         </div>
 
         {/* Ethical Transparency Note */}
-        <div className="mt-3.5 pt-3 border-t border-white/20 flex items-start gap-2 text-[11px] text-rose-100/90 leading-relaxed">
-          <ShieldCheck className="w-4 h-4 shrink-0 text-amber-200 mt-0.5" />
+        <div className="mt-3 pt-2.5 border-t border-white/20 flex items-start gap-2 text-[10px] sm:text-[11px] text-rose-100/90 leading-relaxed">
+          <ShieldCheck className="w-3.5 h-3.5 shrink-0 text-amber-200 mt-0.5" />
           <span>
-            <strong>Mindful Guardrails:</strong> The Love Companion is an idea assistant, NOT a romantic replacement. All suggestions are designed to encourage communication between you and {partnerUser.name}.
+            <strong>Mindful Guardrails:</strong> The Love Companion is an idea assistant, NOT a romantic replacement. All suggestions are designed to encourage communication with {partnerUser.name}.
           </span>
         </div>
       </div>
 
       {/* Feature Navigation Tabs */}
-      <div className="grid grid-cols-4 gap-1.5 p-1 bg-slate-100 rounded-2xl text-xs font-semibold">
+      <div className="grid grid-cols-4 gap-1 sm:gap-1.5 p-1 bg-slate-100/90 rounded-2xl text-[11px] sm:text-xs font-semibold">
         <button
           onClick={() => setActiveCategory('chat')}
-          className={`py-2 rounded-xl transition ${
+          className={`py-2 rounded-xl transition cursor-pointer tap-bounce text-center ${
             activeCategory === 'chat'
-              ? 'bg-white text-rose-600 shadow-xs'
+              ? 'bg-white text-rose-600 shadow-xs font-bold'
               : 'text-slate-500 hover:text-slate-800'
           }`}
         >
@@ -193,9 +193,9 @@ export const AICompanion: React.FC = () => {
         </button>
         <button
           onClick={() => setActiveCategory('dates')}
-          className={`py-2 rounded-xl transition ${
+          className={`py-2 rounded-xl transition cursor-pointer tap-bounce text-center ${
             activeCategory === 'dates'
-              ? 'bg-white text-rose-600 shadow-xs'
+              ? 'bg-white text-rose-600 shadow-xs font-bold'
               : 'text-slate-500 hover:text-slate-800'
           }`}
         >
@@ -203,9 +203,9 @@ export const AICompanion: React.FC = () => {
         </button>
         <button
           onClick={() => setActiveCategory('notes')}
-          className={`py-2 rounded-xl transition ${
+          className={`py-2 rounded-xl transition cursor-pointer tap-bounce text-center ${
             activeCategory === 'notes'
-              ? 'bg-white text-rose-600 shadow-xs'
+              ? 'bg-white text-rose-600 shadow-xs font-bold'
               : 'text-slate-500 hover:text-slate-800'
           }`}
         >
@@ -213,9 +213,9 @@ export const AICompanion: React.FC = () => {
         </button>
         <button
           onClick={() => setActiveCategory('reconnect')}
-          className={`py-2 rounded-xl transition ${
+          className={`py-2 rounded-xl transition cursor-pointer tap-bounce text-center ${
             activeCategory === 'reconnect'
-              ? 'bg-white text-rose-600 shadow-xs'
+              ? 'bg-white text-rose-600 shadow-xs font-bold'
               : 'text-slate-500 hover:text-slate-800'
           }`}
         >
@@ -225,25 +225,47 @@ export const AICompanion: React.FC = () => {
 
       {/* Tab 1: Freeform Companion Assistant */}
       {activeCategory === 'chat' && (
-        <div className="space-y-4">
-          {/* Quick Prompts Carousel */}
+        <div className="space-y-3.5 sm:space-y-4">
+          {/* Quick Suggestions Cards */}
           <div>
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2">
-              Quick Suggestions for Today
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-2 px-1">
+              Tap a spark for quick inspiration:
             </span>
-            <div className="grid grid-cols-1 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {[
-                `"You both have 20 minutes free. Give us a quick virtual date idea!"`,
-                `"Help me write an encouraging good-night note for ${partnerUser.name}."`,
-                `"Give us a thoughtful question to discuss about our future together."`,
-                `"Ways to stay connected when we are both having a super busy work week."`,
-              ].map((preset, idx) => (
+                {
+                  icon: '💡',
+                  title: 'You both have 70 minutes free tonight',
+                  prompt: 'We both have about 70 minutes free tonight across our timezones. Give us 2 fun, creative virtual date ideas we can do together right away!',
+                },
+                {
+                  icon: '💌',
+                  title: `Sweet comforting note for ${partnerUser.name}`,
+                  prompt: `Help me write a heartfelt 2-sentence note to let ${partnerUser.name} know I am thinking of them across the miles.`,
+                },
+                {
+                  icon: '✨',
+                  title: 'Deep question for our late-night call',
+                  prompt: 'Give us a thoughtful, deep question to spark meaningful conversation about our dreams and relationship.',
+                },
+                {
+                  icon: '☕',
+                  title: 'How to stay close during a busy work week',
+                  prompt: 'We are both having an intensely busy work week in different cities. What are 3 micro-rituals to keep our emotional bond strong?',
+                },
+              ].map((item, idx) => (
                 <button
                   key={idx}
-                  onClick={() => handleAskCompanion(preset)}
-                  className="p-3 text-left rounded-2xl bg-white border border-rose-100 hover:border-rose-300 text-xs text-slate-700 font-medium shadow-xs transition"
+                  onClick={() => handleAskCompanion(item.prompt)}
+                  className="p-3 rounded-2xl bg-white hover:bg-rose-50/60 border border-rose-100 shadow-2xs hover:border-rose-200 text-left transition tap-bounce active:scale-[0.98] cursor-pointer flex items-center gap-2.5 group"
                 >
-                  {preset}
+                  <span className="text-xl shrink-0 group-hover:scale-110 transition">{item.icon}</span>
+                  <div className="min-w-0 flex-1">
+                    <span className="text-xs font-bold text-slate-800 block truncate group-hover:text-rose-600">
+                      {item.title}
+                    </span>
+                    <span className="text-[10px] text-slate-400 block truncate">Tap to ask companion</span>
+                  </div>
                 </button>
               ))}
             </div>
@@ -251,29 +273,38 @@ export const AICompanion: React.FC = () => {
 
           {/* AI Response Display */}
           {aiResponse && (
-            <div className="p-4 rounded-3xl bg-rose-50/70 border border-rose-200 text-xs text-slate-800 space-y-2 animate-in fade-in">
-              <div className="flex items-center gap-2 font-bold text-rose-700">
-                <Bot className="w-4 h-4" />
-                <span>Companion's Supportive Guidance</span>
+            <div className="p-4 rounded-[22px] bg-rose-50/80 border border-rose-200/90 text-xs text-slate-800 space-y-2.5 animate-in fade-in shadow-2xs">
+              <div className="flex items-center justify-between font-bold text-rose-700 pb-1.5 border-b border-rose-200/60">
+                <div className="flex items-center gap-1.5">
+                  <Bot className="w-4 h-4" />
+                  <span>Companion's Supportive Guidance</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleSendToChat(aiResponse)}
+                  className="px-2 py-0.5 rounded-lg bg-white text-rose-600 hover:bg-rose-100 font-bold text-[10px] border border-rose-200 cursor-pointer shadow-2xs"
+                >
+                  Send to Chat
+                </button>
               </div>
               <p className="leading-relaxed whitespace-pre-wrap">{aiResponse}</p>
             </div>
           )}
 
           {/* Input Bar */}
-          <div className="bg-white p-3 rounded-2xl border border-rose-100 shadow-sm flex items-center gap-2">
+          <div className="bg-white p-2.5 rounded-2xl border border-rose-200/90 shadow-sm flex items-center gap-2">
             <input
               type="text"
               value={promptInput}
               onChange={(e) => setPromptInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleAskCompanion()}
               placeholder="Ask for advice, sweet words, or date concepts..."
-              className="flex-1 text-xs px-2 py-1 focus:outline-none"
+              className="flex-1 min-w-0 text-xs sm:text-sm px-2.5 py-1 focus:outline-none placeholder:text-slate-400"
             />
             <button
               onClick={() => handleAskCompanion()}
               disabled={isLoading || !promptInput.trim()}
-              className="px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-40 text-white font-bold text-xs flex items-center gap-1 shadow-xs transition"
+              className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 disabled:opacity-35 text-white font-bold text-xs flex items-center gap-1.5 shadow-xs transition tap-bounce active:scale-95 cursor-pointer shrink-0"
             >
               <Send className="w-3.5 h-3.5" />
               <span>{isLoading ? 'Thinking...' : 'Ask'}</span>

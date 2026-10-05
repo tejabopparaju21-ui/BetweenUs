@@ -311,6 +311,21 @@ export const LiveLocationMap: React.FC<LiveLocationMapProps> = () => {
     }
   };
 
+  // Handle "Center on Partner"
+  const handleCenterOnPartner = () => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+    const pLat = partnerLocationData?.latitude;
+    const pLng = partnerLocationData?.longitude;
+    if (pLat && pLng) {
+      map.flyTo([pLat, pLng], 16, {
+        duration: 1.2,
+      });
+    } else {
+      handleFitBoth();
+    }
+  };
+
   // Handle "Fit Both Partners"
   const handleFitBoth = () => {
     const map = mapInstanceRef.current;
@@ -326,11 +341,18 @@ export const LiveLocationMap: React.FC<LiveLocationMapProps> = () => {
         [userLat, userLng],
         [partnerLat, partnerLng],
       ]);
-      map.fitBounds(bounds, { padding: [60, 60], maxZoom: 16 });
+      map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
     } else if (userLat && userLng) {
       map.flyTo([userLat, userLng], 15);
     }
   };
+
+  // Trail state & refs
+  const [showTrail, setShowTrail] = useState<boolean>(true);
+  const userTrailCoordsRef = useRef<[number, number][]>([]);
+  const partnerTrailCoordsRef = useRef<[number, number][]>([]);
+  const userTrailPolylineRef = useRef<L.Polyline | null>(null);
+  const partnerTrailPolylineRef = useRef<L.Polyline | null>(null);
 
   // Toggle Live Location Sharing
   const handleToggleSharing = async () => {
@@ -341,6 +363,78 @@ export const LiveLocationMap: React.FC<LiveLocationMapProps> = () => {
       await requestLocationPermission('current');
     }
   };
+
+  // Record trail coordinates when positions change
+  useEffect(() => {
+    const uLat = currentUser.location?.latitude;
+    const uLng = currentUser.location?.longitude;
+    if (uLat && uLng && isUserSharing) {
+      const arr = userTrailCoordsRef.current;
+      const last = arr[arr.length - 1];
+      if (!last || Math.abs(last[0] - uLat) > 0.0001 || Math.abs(last[1] - uLng) > 0.0001) {
+        userTrailCoordsRef.current = [...arr.slice(-30), [uLat, uLng]];
+      }
+    }
+
+    const pLat = partnerLocationData?.latitude;
+    const pLng = partnerLocationData?.longitude;
+    if (pLat && pLng && isPartnerSharing) {
+      const arr = partnerTrailCoordsRef.current;
+      const last = arr[arr.length - 1];
+      if (!last || Math.abs(last[0] - pLat) > 0.0001 || Math.abs(last[1] - pLng) > 0.0001) {
+        partnerTrailCoordsRef.current = [...arr.slice(-30), [pLat, pLng]];
+      }
+    }
+
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    // Render / update user trail polyline
+    if (showTrail && userTrailCoordsRef.current.length > 1) {
+      if (!userTrailPolylineRef.current) {
+        userTrailPolylineRef.current = L.polyline(userTrailCoordsRef.current, {
+          color: '#f43f5e',
+          weight: 3.5,
+          opacity: 0.75,
+          lineCap: 'round',
+          lineJoin: 'round',
+          dashArray: '4, 6',
+        }).addTo(map);
+      } else {
+        userTrailPolylineRef.current.setLatLngs(userTrailCoordsRef.current);
+      }
+    } else if (userTrailPolylineRef.current) {
+      userTrailPolylineRef.current.remove();
+      userTrailPolylineRef.current = null;
+    }
+
+    // Render / update partner trail polyline
+    if (showTrail && partnerTrailCoordsRef.current.length > 1) {
+      if (!partnerTrailPolylineRef.current) {
+        partnerTrailPolylineRef.current = L.polyline(partnerTrailCoordsRef.current, {
+          color: '#6366f1',
+          weight: 3.5,
+          opacity: 0.75,
+          lineCap: 'round',
+          lineJoin: 'round',
+          dashArray: '4, 6',
+        }).addTo(map);
+      } else {
+        partnerTrailPolylineRef.current.setLatLngs(partnerTrailCoordsRef.current);
+      }
+    } else if (partnerTrailPolylineRef.current) {
+      partnerTrailPolylineRef.current.remove();
+      partnerTrailPolylineRef.current = null;
+    }
+  }, [
+    currentUser.location?.latitude,
+    currentUser.location?.longitude,
+    partnerLocationData?.latitude,
+    partnerLocationData?.longitude,
+    isUserSharing,
+    isPartnerSharing,
+    showTrail,
+  ]);
 
   // Distance computation
   const userLat = currentUser.location?.latitude;
@@ -353,116 +447,177 @@ export const LiveLocationMap: React.FC<LiveLocationMapProps> = () => {
   }
 
   return (
-    <div className="relative rounded-3xl bg-white/95 backdrop-blur-md border border-white/80 shadow-xl overflow-hidden flex flex-col">
-      {/* Top Header Bar */}
-      <div className="p-4 bg-gradient-to-r from-rose-50/90 via-pink-50/80 to-indigo-50/90 border-b border-rose-100 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-rose-500 to-pink-600 flex items-center justify-center text-white shadow-md shadow-rose-500/20 shrink-0">
-            <Compass className={`w-5 h-5 ${isUserSharing ? 'animate-spin' : ''}`} style={{ animationDuration: '15s' }} />
+    <div className="relative rounded-3xl bg-white/95 backdrop-blur-md border border-rose-100 shadow-xl overflow-hidden flex flex-col">
+      {/* 1. TOP HEADER: "Live Location ❤️" */}
+      <div className="p-3.5 sm:p-4 bg-gradient-to-r from-rose-50/90 via-pink-50/80 to-rose-50/90 border-b border-rose-100 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-gradient-to-br from-rose-500 to-pink-600 flex items-center justify-center text-white shadow-md shadow-rose-500/20 shrink-0">
+            <Compass className={`w-4 h-4 sm:w-5 sm:h-5 ${isUserSharing ? 'animate-spin' : ''}`} style={{ animationDuration: '15s' }} />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-extrabold text-sm text-slate-800">Two-Person Live Location</span>
+              <h3 className="font-extrabold text-sm sm:text-base text-slate-800">Live Location ❤️</h3>
               <span
-                className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${
                   isUserSharing
                     ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                     : 'bg-slate-100 text-slate-600 border-slate-200'
                 }`}
               >
-                <span className={`w-2 h-2 rounded-full ${isUserSharing ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
-                <span>{isUserSharing ? '🟢 Live location ON' : '⚪ Live location OFF'}</span>
+                <span className={`w-1.5 h-1.5 rounded-full ${isUserSharing ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
+                <span>{isUserSharing ? 'GPS ON' : 'GPS OFF'}</span>
               </span>
             </div>
-            <p className="text-xs text-slate-500">
-              Real-time GPS synchronization powered by Geoapify &amp; Firebase
+            <p className="text-[11px] text-slate-500 hidden sm:block">
+              Continuous GPS synchronization across India
             </p>
           </div>
         </div>
 
         {/* Start / Stop Button */}
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handleToggleSharing}
-            disabled={isLocating}
-            className={`px-4 py-2 rounded-2xl font-black text-xs shadow-md transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer ${
-              isUserSharing
-                ? 'bg-red-500 hover:bg-red-600 text-white shadow-red-500/20'
-                : 'bg-rose-600 hover:bg-rose-700 text-white shadow-rose-600/20'
-            }`}
-          >
-            {isLocating ? (
-              <RefreshCw className="w-4 h-4 animate-spin" />
-            ) : (
-              <Navigation className="w-4 h-4" />
-            )}
-            <span>{isUserSharing ? 'Stop Live Location' : 'Start Live Location'}</span>
-          </button>
+        <button
+          type="button"
+          onClick={handleToggleSharing}
+          disabled={isLocating}
+          className={`min-h-[40px] px-3.5 py-1.5 rounded-xl font-bold text-xs shadow-sm transition active:scale-95 flex items-center gap-1.5 cursor-pointer shrink-0 ${
+            isUserSharing
+              ? 'bg-red-500 hover:bg-red-600 text-white shadow-red-500/20'
+              : 'bg-rose-600 hover:bg-rose-700 text-white shadow-rose-600/20'
+          }`}
+        >
+          {isLocating ? (
+            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+          ) : (
+            <Navigation className="w-3.5 h-3.5" />
+          )}
+          <span>{isUserSharing ? 'Stop' : 'Share GPS'}</span>
+        </button>
+      </div>
+
+      {/* 2. COMPACT PARTNER / LOCATION STATUS CARD */}
+      <div className="p-3 bg-gradient-to-r from-rose-50/60 via-pink-50/40 to-indigo-50/60 border-b border-rose-100/70">
+        <div className="flex items-center justify-between gap-2">
+          {/* User Side */}
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="relative shrink-0">
+              <img
+                src={currentUser.avatarUrl || '/app-logo.svg'}
+                alt={currentUser.name}
+                className="w-8 h-8 rounded-full object-cover border-2 border-rose-400"
+              />
+              <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white ${isUserSharing ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`} />
+            </div>
+            <div className="min-w-0 leading-tight">
+              <span className="text-xs font-bold text-slate-800 block truncate">{currentUser.name}</span>
+              <span className="text-[10px] text-slate-500 block truncate">{currentUser.city || 'Hyderabad'}</span>
+            </div>
+          </div>
+
+          {/* Connection & Distance Pill */}
+          <div className="flex flex-col items-center justify-center shrink-0 px-2 py-1 rounded-xl bg-white/90 shadow-2xs border border-rose-100">
+            <span className="text-xs">❤️</span>
+            <span className="text-[10px] font-extrabold text-rose-700 whitespace-nowrap">
+              {distanceKm !== null ? `${distanceKm.toLocaleString()} km` : 'Radar active'}
+            </span>
+          </div>
+
+          {/* Partner Side */}
+          <div className="flex items-center gap-2 min-w-0 justify-end text-right">
+            <div className="min-w-0 leading-tight">
+              <span className="text-xs font-bold text-slate-800 block truncate">{partnerUser.name}</span>
+              <span className="text-[10px] text-slate-500 block truncate">{partnerUser.city || 'Bengaluru'}</span>
+            </div>
+            <div className="relative shrink-0">
+              <img
+                src={partnerUser.avatarUrl || '/app-logo.svg'}
+                alt={partnerUser.name}
+                className="w-8 h-8 rounded-full object-cover border-2 border-indigo-400"
+              />
+              <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white ${isPartnerSharing ? 'bg-indigo-500' : 'bg-slate-300'}`} />
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Map Error Banner */}
       {locationError && (
-        <div className="p-3 bg-red-50 border-b border-red-200 text-red-700 text-xs flex items-center gap-2">
+        <div className="p-2.5 bg-red-50 border-b border-red-200 text-red-700 text-xs flex items-center gap-2">
           <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
           <span className="flex-1 font-medium">{locationError}</span>
         </div>
       )}
 
-      {/* Map Tile notice if Geoapify key needs configuration */}
-      {!hasGeoapifyKey && (
-        <div className="px-4 py-1.5 bg-amber-50 border-b border-amber-200 text-amber-800 text-[11px] flex items-center justify-between">
-          <span>ℹ️ Using OpenStreetMap fallback tiles. Add <code>VITE_GEOAPIFY_API_KEY</code> in <code>.env</code> for Geoapify Carto tiles.</span>
-          <span className="font-bold text-[10px] bg-amber-100 px-2 py-0.5 rounded-full">OSM Active</span>
-        </div>
-      )}
-
-      {/* Interactive Leaflet Map Container */}
-      <div className="relative w-full h-[380px] sm:h-[440px] bg-slate-100">
+      {/* 3. LARGE RESPONSIVE MAP CONTAINER */}
+      <div className="relative w-full h-[320px] sm:h-[400px] bg-slate-100">
         <div ref={mapContainerRef} className="w-full h-full z-0" />
-
-        {/* Map Floating Overlay Controls */}
-        <div className="absolute bottom-4 right-4 z-10 flex flex-col gap-2">
-          {/* Fit Both Partners button */}
-          {userLat && partnerLat && isUserSharing && isPartnerSharing && (
-            <button
-              type="button"
-              onClick={handleFitBoth}
-              className="p-2.5 rounded-2xl bg-white/95 hover:bg-white text-slate-700 shadow-lg border border-slate-200/80 backdrop-blur-xs font-bold text-xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer"
-              title="Fit both partners on map"
-            >
-              <Maximize2 className="w-4 h-4 text-indigo-600" />
-              <span className="text-[11px]">Fit Both</span>
-            </button>
-          )}
-
-          {/* Center on Me Button */}
-          <button
-            type="button"
-            onClick={handleCenterOnMe}
-            className="p-2.5 rounded-2xl bg-white/95 hover:bg-white text-slate-800 shadow-lg border border-slate-200/80 backdrop-blur-xs font-bold text-xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer"
-            title="Center map on my live GPS position"
-          >
-            <Crosshair className="w-4 h-4 text-rose-600 animate-pulse" />
-            <span className="text-[11px]">Center on me</span>
-          </button>
-        </div>
 
         {/* Floating Distance Badge on Map */}
         {distanceKm !== null && (
-          <div className="absolute top-4 left-4 z-10 bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-2xl shadow-lg border border-rose-200 flex items-center gap-2">
-            <span className="text-base">❤️</span>
-            <div className="text-xs">
-              <span className="font-extrabold text-slate-800 block">
-                {distanceKm.toLocaleString()} km apart
-              </span>
-              <span className="text-[10px] text-slate-500 font-medium">
-                ({kmToMiles(distanceKm).toLocaleString()} miles)
-              </span>
-            </div>
+          <div className="absolute top-3 left-3 z-10 bg-white/95 backdrop-blur-md px-2.5 py-1 rounded-xl shadow-md border border-rose-200 flex items-center gap-1.5 pointer-events-none">
+            <span className="text-xs">❤️</span>
+            <span className="text-[11px] font-extrabold text-slate-800">
+              {distanceKm.toLocaleString()} km apart
+            </span>
           </div>
         )}
+      </div>
+
+      {/* 4. COMPACT CONTROLS DOCK: 📍 My Location | ❤️ Partner | 🛤 Trail | ⟳ Refresh */}
+      <div className="p-2.5 bg-white border-t border-rose-100 shadow-inner">
+        <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
+          {/* 📍 My Location */}
+          <button
+            type="button"
+            onClick={handleCenterOnMe}
+            className="min-h-[42px] py-2 px-1.5 rounded-xl bg-slate-50 hover:bg-rose-50 text-slate-700 active:scale-95 transition flex flex-col items-center justify-center gap-0.5 border border-slate-200/80 cursor-pointer"
+            title="Center on my location"
+          >
+            <Crosshair className="w-4 h-4 text-rose-600" />
+            <span className="text-[10px] font-bold truncate">My Location</span>
+          </button>
+
+          {/* ❤️ Partner */}
+          <button
+            type="button"
+            onClick={handleCenterOnPartner}
+            className="min-h-[42px] py-2 px-1.5 rounded-xl bg-slate-50 hover:bg-indigo-50 text-slate-700 active:scale-95 transition flex flex-col items-center justify-center gap-0.5 border border-slate-200/80 cursor-pointer"
+            title="Center on partner location"
+          >
+            <Navigation className="w-4 h-4 text-indigo-600 rotate-45" />
+            <span className="text-[10px] font-bold truncate">Partner</span>
+          </button>
+
+          {/* 🛤 Trail */}
+          <button
+            type="button"
+            onClick={() => setShowTrail(!showTrail)}
+            className={`min-h-[42px] py-2 px-1.5 rounded-xl transition flex flex-col items-center justify-center gap-0.5 border active:scale-95 cursor-pointer ${
+              showTrail
+                ? 'bg-rose-50 text-rose-700 border-rose-300 font-extrabold'
+                : 'bg-slate-50 text-slate-500 border-slate-200'
+            }`}
+            title="Toggle GPS movement trail"
+          >
+            <Compass className="w-4 h-4" />
+            <span className="text-[10px] font-bold truncate">
+              {showTrail ? '🛤 Trail ON' : '🛤 Trail OFF'}
+            </span>
+          </button>
+
+          {/* ⟳ Refresh */}
+          <button
+            type="button"
+            onClick={async () => {
+              await requestLocationPermission('current');
+            }}
+            disabled={isLocating}
+            className="min-h-[42px] py-2 px-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 active:scale-95 transition flex flex-col items-center justify-center gap-0.5 border border-slate-200/80 cursor-pointer"
+            title="Refresh GPS position"
+          >
+            <RefreshCw className={`w-4 h-4 text-slate-600 ${isLocating ? 'animate-spin' : ''}`} />
+            <span className="text-[10px] font-bold truncate">Refresh</span>
+          </button>
+        </div>
       </div>
 
       {/* Live Status & Accuracy Footer */}

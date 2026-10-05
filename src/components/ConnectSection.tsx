@@ -165,14 +165,14 @@ export const ConnectSection: React.FC = () => {
   };
 
   return (
-    <div className="max-w-md mx-auto px-4 py-5 space-y-5 pb-24">
+    <div className="w-full max-w-md md:max-w-3xl lg:max-w-4xl mx-auto px-3.5 sm:px-5 py-4 sm:py-6 space-y-4 sm:space-y-5 pb-24">
       {/* Top Category Segment Controls */}
-      <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-2xl overflow-x-auto text-xs font-semibold no-scrollbar">
+      <div className="flex items-center gap-1.5 p-1 bg-slate-100/90 rounded-2xl overflow-x-auto text-xs font-semibold no-scrollbar">
         <button
           onClick={() => setActiveSubTab('games')}
-          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl whitespace-nowrap transition ${
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl whitespace-nowrap transition cursor-pointer tap-bounce ${
             activeSubTab === 'games'
-              ? 'bg-white text-rose-600 shadow-xs'
+              ? 'bg-white text-rose-600 shadow-xs font-bold'
               : 'text-slate-500 hover:text-slate-800'
           }`}
         >
@@ -181,9 +181,9 @@ export const ConnectSection: React.FC = () => {
         </button>
         <button
           onClick={() => setActiveSubTab('surprises')}
-          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl whitespace-nowrap transition ${
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl whitespace-nowrap transition cursor-pointer tap-bounce ${
             activeSubTab === 'surprises'
-              ? 'bg-white text-rose-600 shadow-xs'
+              ? 'bg-white text-rose-600 shadow-xs font-bold'
               : 'text-slate-500 hover:text-slate-800'
           }`}
         >
@@ -192,9 +192,9 @@ export const ConnectSection: React.FC = () => {
         </button>
         <button
           onClick={() => setActiveSubTab('dates')}
-          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl whitespace-nowrap transition ${
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl whitespace-nowrap transition cursor-pointer tap-bounce ${
             activeSubTab === 'dates'
-              ? 'bg-white text-rose-600 shadow-xs'
+              ? 'bg-white text-rose-600 shadow-xs font-bold'
               : 'text-slate-500 hover:text-slate-800'
           }`}
         >
@@ -203,9 +203,9 @@ export const ConnectSection: React.FC = () => {
         </button>
         <button
           onClick={() => setActiveSubTab('notes')}
-          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl whitespace-nowrap transition ${
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl whitespace-nowrap transition cursor-pointer tap-bounce ${
             activeSubTab === 'notes'
-              ? 'bg-white text-rose-600 shadow-xs'
+              ? 'bg-white text-rose-600 shadow-xs font-bold'
               : 'text-slate-500 hover:text-slate-800'
           }`}
         >
@@ -214,9 +214,9 @@ export const ConnectSection: React.FC = () => {
         </button>
         <button
           onClick={() => setActiveSubTab('music')}
-          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl whitespace-nowrap transition ${
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl whitespace-nowrap transition cursor-pointer tap-bounce ${
             activeSubTab === 'music'
-              ? 'bg-white text-rose-600 shadow-xs'
+              ? 'bg-white text-rose-600 shadow-xs font-bold'
               : 'text-slate-500 hover:text-slate-800'
           }`}
         >
@@ -227,34 +227,78 @@ export const ConnectSection: React.FC = () => {
 
       {/* 1. COUPLE GAMES */}
       {activeSubTab === 'games' && (
-        <div className="space-y-4">
-          <div className="bg-gradient-to-r from-purple-500 via-rose-500 to-pink-500 p-5 rounded-3xl text-white shadow-md">
-            <h3 className="font-extrabold text-base flex items-center gap-2">
-              <Gamepad2 className="w-5 h-5" />
-              <span>Multiplayer Couple Games</span>
-            </h3>
-            <p className="text-xs text-rose-100 mt-1">
-              Play together across timezones. Submit your answers and reveal how synced you are!
-            </p>
+        <div className="space-y-3.5 sm:space-y-4">
+          <div className="bg-gradient-to-r from-rose-500 via-pink-500 to-rose-600 p-4 sm:p-5 rounded-[22px] text-white shadow-md text-center sm:text-left relative overflow-hidden">
+            <div className="flex flex-col sm:flex-row items-center gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-2xl shadow-inner shrink-0">
+                🎮
+              </div>
+              <div>
+                <h3 className="font-extrabold text-base sm:text-lg flex items-center justify-center sm:justify-start gap-1.5">
+                  <span>Couple Games</span>
+                  <Heart className="w-4 h-4 fill-white text-white" />
+                </h3>
+                <p className="text-xs text-rose-100 mt-0.5">
+                  Play together, even when you're apart ❤️
+                </p>
+              </div>
+            </div>
           </div>
 
-          {/* Game Selectors */}
-          <div className="grid grid-cols-2 gap-2.5">
+          {/* Game Selectors 2-Column Mobile Grid */}
+          <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
             {[
-              { id: 'would_you_rather', title: 'Would You Rather', icon: '🤔', color: 'bg-indigo-50 border-indigo-200' },
-              { id: 'truth_or_dare', title: 'Truth or Dare', icon: '💖', color: 'bg-rose-50 border-rose-200' },
-              { id: 'couple_quiz', title: 'Couple Quiz', icon: '🎯', color: 'bg-amber-50 border-amber-200' },
-              { id: 'this_or_that', title: 'This or That', icon: '⚡', color: 'bg-emerald-50 border-emerald-200' },
+              {
+                id: 'would_you_rather',
+                title: 'Would You Rather',
+                subtitle: 'Discover each other',
+                icon: '🥰',
+                badge: 'Popular',
+                gradient: 'from-pink-50 to-rose-50 border-pink-200/80 hover:border-pink-300',
+              },
+              {
+                id: 'truth_or_dare',
+                title: 'Truth or Dare',
+                subtitle: 'Make it interesting',
+                icon: '❤️',
+                badge: 'Spicy',
+                gradient: 'from-rose-50 to-red-50 border-rose-200/80 hover:border-rose-300',
+              },
+              {
+                id: 'couple_quiz',
+                title: 'Couple Quiz',
+                subtitle: 'How well do you know',
+                icon: '🎯',
+                badge: 'Trivia',
+                gradient: 'from-amber-50 to-orange-50 border-amber-200/80 hover:border-amber-300',
+              },
+              {
+                id: 'this_or_that',
+                title: 'This or That',
+                subtitle: 'Choose together',
+                icon: '⚡',
+                badge: 'Quick',
+                gradient: 'from-purple-50 to-pink-50 border-purple-200/80 hover:border-purple-300',
+              },
             ].map((g) => (
               <button
                 key={g.id}
                 onClick={() => startNewGame(g.id as any)}
-                className={`p-3.5 rounded-2xl border text-left flex flex-col justify-between hover:shadow-sm transition active:scale-98 ${g.color}`}
+                className={`p-3.5 sm:p-4 rounded-[20px] border bg-gradient-to-br text-left flex flex-col justify-between shadow-2xs hover:shadow-sm transition tap-bounce active:scale-[0.98] cursor-pointer min-h-[105px] group ${g.gradient}`}
               >
-                <span className="text-2xl">{g.icon}</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-2xl sm:text-3xl group-hover:scale-110 transition duration-150">{g.icon}</span>
+                  <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded-full bg-white/90 text-slate-700 shadow-2xs border border-white/80">
+                    {g.badge}
+                  </span>
+                </div>
                 <div className="mt-2">
-                  <span className="text-xs font-bold text-slate-800 block">{g.title}</span>
-                  <span className="text-[10px] text-slate-500">Start new round</span>
+                  <span className="text-xs sm:text-sm font-extrabold text-slate-900 block leading-tight">
+                    {g.title}
+                  </span>
+                  <span className="text-[10px] text-slate-500 line-clamp-1 mt-0.5">
+                    {g.subtitle}
+                  </span>
                 </div>
               </button>
             ))}

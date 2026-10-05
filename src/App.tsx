@@ -74,7 +74,7 @@ function MainAppContent() {
       <EmergencyAlertModal />
       <Navigation />
 
-      <main className="flex-1 w-full max-w-lg mx-auto relative z-10">
+      <main className="flex-1 w-full max-w-md sm:max-w-2xl md:max-w-4xl lg:max-w-5xl mx-auto relative z-10 transition-all">
         {activeTab === 'home' && <HomeDashboard />}
         {activeTab === 'chat' && <CoupleChat />}
         {activeTab === 'connect' && <ConnectSection />}

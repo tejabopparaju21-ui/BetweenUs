@@ -105,14 +105,34 @@ export const MemoriesSection: React.FC = () => {
   const todayMemory = memories[0];
 
   return (
-    <div className="max-w-md mx-auto px-4 py-5 space-y-5 pb-24">
+    <div className="w-full max-w-md md:max-w-3xl lg:max-w-4xl mx-auto px-3.5 sm:px-5 py-4 sm:py-6 space-y-4 sm:space-y-5 pb-24">
+      {/* Header */}
+      <div className="flex items-center justify-between px-1">
+        <div>
+          <h2 className="text-lg sm:text-xl font-black text-slate-900 flex items-center gap-1.5">
+            <span>Our Story</span>
+            <span className="text-rose-500">❤️</span>
+          </h2>
+          <p className="text-[11px] text-slate-500 font-medium">
+            Every flight, call, and milestone captured across the miles
+          </p>
+        </div>
+        <button
+          onClick={() => setShowMemoryModal(true)}
+          className="flex items-center gap-1 px-3 py-1.5 bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 text-white rounded-xl text-xs font-bold shadow-xs transition active:scale-95 cursor-pointer tap-bounce shrink-0"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          <span>Add Memory</span>
+        </button>
+      </div>
+
       {/* Category Tabs */}
-      <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-2xl text-xs font-semibold">
+      <div className="flex items-center gap-1.5 p-1 bg-slate-100/90 rounded-2xl overflow-x-auto text-xs font-semibold no-scrollbar">
         <button
           onClick={() => setActiveTab('timeline')}
-          className={`flex-1 py-2 rounded-xl transition ${
+          className={`flex-1 min-w-[90px] py-2 rounded-xl transition cursor-pointer tap-bounce text-center ${
             activeTab === 'timeline'
-              ? 'bg-white text-rose-600 shadow-xs'
+              ? 'bg-white text-rose-600 shadow-xs font-bold'
               : 'text-slate-500 hover:text-slate-800'
           }`}
         >
@@ -120,9 +140,9 @@ export const MemoriesSection: React.FC = () => {
         </button>
         <button
           onClick={() => setActiveTab('countdowns')}
-          className={`flex-1 py-2 rounded-xl transition ${
+          className={`flex-1 min-w-[90px] py-2 rounded-xl transition cursor-pointer tap-bounce text-center ${
             activeTab === 'countdowns'
-              ? 'bg-white text-rose-600 shadow-xs'
+              ? 'bg-white text-rose-600 shadow-xs font-bold'
               : 'text-slate-500 hover:text-slate-800'
           }`}
         >
@@ -130,9 +150,9 @@ export const MemoriesSection: React.FC = () => {
         </button>
         <button
           onClick={() => setActiveTab('events')}
-          className={`flex-1 py-2 rounded-xl transition ${
+          className={`flex-1 min-w-[90px] py-2 rounded-xl transition cursor-pointer tap-bounce text-center ${
             activeTab === 'events'
-              ? 'bg-white text-rose-600 shadow-xs'
+              ? 'bg-white text-rose-600 shadow-xs font-bold'
               : 'text-slate-500 hover:text-slate-800'
           }`}
         >
@@ -143,82 +163,78 @@ export const MemoriesSection: React.FC = () => {
       {/* 1. MEMORIES TIMELINE */}
       {activeTab === 'timeline' && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-bold text-slate-800">Our Story & Milestones 📖</h3>
-              <p className="text-xs text-slate-500">Every flight, call, and memory across the miles</p>
-            </div>
-            <button
-              onClick={() => setShowMemoryModal(true)}
-              className="flex items-center gap-1 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-xs transition"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Add Memory</span>
-            </button>
-          </div>
-
           {/* "On This Day" Spotlight */}
           {todayMemory && (
-            <div className="p-4 rounded-3xl bg-gradient-to-r from-pink-50 to-rose-50 border border-rose-200/80 space-y-2">
+            <div className="p-4 rounded-[22px] bg-gradient-to-r from-pink-50/90 via-rose-50/90 to-purple-50/80 border border-rose-200/70 space-y-1.5 shadow-2xs">
               <span className="text-[10px] uppercase font-bold tracking-wider text-rose-600 flex items-center gap-1">
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>On This Day Memory Spotlight</span>
+                <span>On This Day Spotlight</span>
               </span>
               <h4 className="font-extrabold text-sm text-slate-800">{todayMemory.title}</h4>
               <p className="text-xs text-slate-600 italic">"{todayMemory.description}"</p>
             </div>
           )}
 
-          {/* Timeline Cards */}
-          <div className="space-y-4 relative before:absolute before:inset-0 before:left-4 before:w-0.5 before:bg-rose-200">
+          {/* Full-width Memory Cards (1 per row on mobile) */}
+          <div className="space-y-4">
             {memories.map((mem) => (
-              <div key={mem.id} className="relative pl-9">
-                {/* Timeline dot */}
-                <div className="absolute left-2.5 top-4 w-3.5 h-3.5 rounded-full bg-rose-500 ring-4 ring-rose-100 -translate-x-1/2" />
-
-                <div className="bg-white rounded-3xl overflow-hidden border border-rose-100 shadow-sm hover:border-rose-200 transition">
-                  <div className="h-44 overflow-hidden relative">
-                    {mem.mediaType === 'video' || mem.mediaUrl.startsWith('data:video') || mem.mediaUrl.endsWith('.mp4') ? (
-                      <video
-                        src={mem.mediaUrl}
-                        controls
-                        playsInline
-                        className="w-full h-full object-cover bg-black"
-                      />
-                    ) : (
-                      <img
-                        src={mem.mediaUrl}
-                        alt={mem.title}
-                        className="w-full h-full object-cover"
-                      />
-                    )}
-                    <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-xs text-white text-[10px] px-2 py-0.5 rounded-lg flex items-center gap-1">
-                      <Calendar className="w-3 h-3" />
-                      <span>{mem.date}</span>
+              <div
+                key={mem.id}
+                className="bg-white rounded-[24px] overflow-hidden border border-rose-100 shadow-sm hover:shadow-md transition duration-200"
+              >
+                {/* 16 / 10 Aspect Ratio Image */}
+                <div className="w-full aspect-[16/10] overflow-hidden relative bg-slate-900">
+                  {mem.mediaType === 'video' || mem.mediaUrl.startsWith('data:video') || mem.mediaUrl.endsWith('.mp4') ? (
+                    <video
+                      src={mem.mediaUrl}
+                      controls
+                      playsInline
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <img
+                      src={mem.mediaUrl}
+                      alt={mem.title}
+                      className="w-full h-full object-cover hover:scale-102 transition duration-300"
+                      loading="lazy"
+                    />
+                  )}
+                  <div className="absolute bottom-2.5 left-2.5 bg-black/60 backdrop-blur-md text-white text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1.5 shadow-xs">
+                    <Calendar className="w-3 h-3 text-rose-300" />
+                    <span>{mem.date}</span>
+                  </div>
+                  {mem.addedByName && (
+                    <div className="absolute top-2.5 right-2.5 bg-black/50 backdrop-blur-md text-white text-[9px] font-semibold px-2 py-0.5 rounded-full">
+                      By {mem.addedByName}
                     </div>
+                  )}
+                </div>
+
+                {/* Details Container */}
+                <div className="p-4 sm:p-5 space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <h4 className="font-extrabold text-sm sm:text-base text-slate-900 leading-snug">
+                      {mem.title}
+                    </h4>
+                    <button
+                      type="button"
+                      onClick={() => likeMemory(mem.id)}
+                      className="flex items-center gap-1.5 text-xs text-rose-600 bg-rose-50 hover:bg-rose-100 px-2.5 py-1 rounded-xl transition cursor-pointer tap-bounce shrink-0"
+                      title="Heart this memory"
+                    >
+                      <Heart className="w-3.5 h-3.5 fill-rose-500 text-rose-500" />
+                      <span className="font-black">{mem.likesCount}</span>
+                    </button>
                   </div>
 
-                  <div className="p-4 space-y-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <h4 className="font-bold text-sm text-slate-800">{mem.title}</h4>
-                      <button
-                        onClick={() => likeMemory(mem.id)}
-                        className="flex items-center gap-1 text-xs text-rose-600 bg-rose-50 px-2 py-1 rounded-xl"
-                      >
-                        <Heart className="w-3.5 h-3.5 fill-rose-500" />
-                        <span className="font-bold">{mem.likesCount}</span>
-                      </button>
+                  <p className="text-xs text-slate-600 leading-relaxed">{mem.description}</p>
+
+                  {mem.locationName && (
+                    <div className="flex items-center gap-1.5 text-[11px] text-slate-500 pt-1 border-t border-slate-50">
+                      <MapPin className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                      <span className="font-medium truncate">{mem.locationName}</span>
                     </div>
-
-                    <p className="text-xs text-slate-600 leading-relaxed">{mem.description}</p>
-
-                    {mem.locationName && (
-                      <div className="flex items-center gap-1 text-[11px] text-slate-400 pt-1">
-                        <MapPin className="w-3.5 h-3.5 text-rose-500" />
-                        <span>{mem.locationName}</span>
-                      </div>
-                    )}
-                  </div>
+                  )}
                 </div>
               </div>
             ))}

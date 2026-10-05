@@ -154,135 +154,263 @@ export const HomeDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Top Wallpaper View Action Header */}
+      {/* Top Mobile Couple Greeting & Wallpaper Peek Button */}
       <div className="flex items-center justify-between px-1">
-        <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 bg-white/75 backdrop-blur-md px-3 py-1 rounded-full border border-white/80 shadow-xs">
-          <Heart className="w-3.5 h-3.5 text-rose-500 fill-rose-500 animate-pulse" />
-          <span>Home of {couple?.relationshipName || `${currentUser.name} & ${partnerUser.name}`}</span>
+        <div>
+          <h2 className="text-base sm:text-lg font-black text-slate-900 flex items-center gap-1.5">
+            <span>
+              {(() => {
+                const hour = new Date(currentTimeTick).getHours();
+                if (hour >= 5 && hour < 12) return 'Good morning';
+                if (hour >= 12 && hour < 17) return 'Good afternoon';
+                if (hour >= 17 && hour < 21) return 'Good evening';
+                return 'Good night';
+              })()}
+              , {currentUser.name}
+            </span>
+            <span className="text-rose-500">❤️</span>
+          </h2>
+          <p className="text-[11px] text-slate-500 font-medium">
+            {bothShareLocation
+              ? `${distanceKm.toLocaleString()} km apart • Connected heart to heart`
+              : `Your private haven with ${partnerUser.name}`}
+          </p>
         </div>
         <button
           type="button"
           onClick={() => setPeekWallpaper(!peekWallpaper)}
-          className="text-xs font-bold text-slate-800 bg-white/75 hover:bg-white/95 backdrop-blur-md px-3 py-1 rounded-full border border-white/80 shadow-xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer"
-          title="Toggle unobstructed view of background wallpaper"
+          className="text-xs font-bold text-slate-700 bg-white/85 hover:bg-white backdrop-blur-md px-3 py-1.5 rounded-full border border-rose-100 shadow-2xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer shrink-0"
+          title="Toggle wallpaper view"
         >
           <Eye className="w-3.5 h-3.5 text-rose-500" />
-          <span>{peekWallpaper ? 'Show Dashboard' : 'View Wallpaper'}</span>
+          <span className="hidden xs:inline">{peekWallpaper ? 'Dashboard' : 'Wallpaper'}</span>
         </button>
       </div>
 
       {/* Main Home Dashboard Cards with Smooth Peek Transition */}
-      <div className={`space-y-5 transition-all duration-300 ${peekWallpaper ? 'opacity-0 pointer-events-none scale-95' : 'opacity-100 scale-100'}`}>
-        {/* Hero Couple Avatars & Distance Header */}
-        <div className="relative overflow-hidden rounded-3xl p-6 text-white shadow-2xl shadow-rose-950/25 border border-white/30 backdrop-blur-xl">
-          {/* Ambient holding-hands art backdrop */}
+      <div className={`space-y-4 sm:space-y-5 transition-all duration-300 ${peekWallpaper ? 'opacity-0 pointer-events-none scale-95' : 'opacity-100 scale-100'}`}>
+        {/* Couple Connection Centerpiece Card - Sleek, Romantic, Mobile-Optimized */}
+        <div className="relative overflow-hidden rounded-[24px] p-4 sm:p-5 text-white shadow-xl shadow-rose-950/20 border border-white/30 backdrop-blur-xl">
+          {/* Holding hands backdrop image with romantic rose tint */}
           <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
             <img
               src="/home-bg.jpg"
-              alt="Holding Hands Background"
+              alt=""
               className="w-full h-full object-cover object-[center_35%] filter brightness-90 saturate-110"
             />
             <div className="absolute inset-0 bg-gradient-to-b from-rose-950/85 via-rose-900/80 to-pink-950/85 backdrop-blur-[1px]" />
           </div>
 
-          {/* Soft background glow circles */}
-          <div className="absolute -top-12 -right-12 w-48 h-48 rounded-full bg-white/10 blur-2xl z-0" />
-          <div className="absolute -bottom-10 -left-10 w-44 h-44 rounded-full bg-pink-400/20 blur-xl z-0" />
-
-        <div className="relative z-10 text-center">
-          <div className="text-xs font-semibold tracking-wider uppercase text-rose-100 flex items-center justify-center gap-1.5 mb-2">
-            <Sparkles className="w-3.5 h-3.5 text-rose-200" />
-            <span>{couple?.relationshipName || `${currentUser.name} & ${partnerUser.name}`}</span>
-          </div>
-
-          {/* Intertwined Avatars with connecting heart */}
-          <div className="flex items-center justify-center gap-4 my-3">
-            {/* User Avatar */}
-            <div className="relative">
-              <img
-                src={currentUser.avatarUrl}
-                alt={currentUser.name}
-                className="w-18 h-18 rounded-full object-cover border-3 border-white/90 shadow-md ring-4 ring-rose-400/30"
-              />
-              <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-white text-rose-700 text-[10px] font-bold shadow-xs whitespace-nowrap">
-                You
+          <div className="relative z-10">
+            {/* Top status bar inside card */}
+            <div className="flex items-center justify-between text-[11px] text-rose-100 mb-2.5 pb-2 border-b border-white/15">
+              <span className="inline-flex items-center gap-1 font-bold">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>Connected</span>
+              </span>
+              <span className="text-[10px] font-semibold bg-white/20 px-2 py-0.5 rounded-full">
+                {daysTogether} days together
               </span>
             </div>
 
-            {/* Connecting heart & days together */}
-            <div className="flex flex-col items-center justify-center">
-              <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center shadow-inner border border-white/30">
-                <Heart className="w-5 h-5 text-white fill-white/80 animate-pulse" />
-              </div>
-              <span className="text-[10px] text-rose-100 font-semibold mt-1">
-                {daysTogether} days
-              </span>
-            </div>
-
-            {/* Partner Avatar */}
-            <div className="relative">
-              <img
-                src={partnerUser.avatarUrl}
-                alt={partnerUser.name}
-                className="w-18 h-18 rounded-full object-cover border-3 border-white/90 shadow-md ring-4 ring-rose-400/30"
-              />
-              <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-white text-rose-700 text-[10px] font-bold shadow-xs whitespace-nowrap">
-                {partnerUser.name}
-              </span>
-            </div>
-          </div>
-
-          {/* Distance Indicator & Live Location Access */}
-          <div className="mt-4 pt-3 border-t border-white/20 flex flex-col items-center">
-            {bothShareLocation ? (
-              <>
-                <button
-                  onClick={() => setShowLocationDialog(true)}
-                  className="flex items-center gap-1.5 text-sm font-bold bg-white/20 hover:bg-white/30 text-white px-4 py-1.5 rounded-full backdrop-blur-xs transition shadow-xs group"
-                  title="Click to view live coordinates, GPS status, and map details"
-                >
-                  <MapPin className="w-4 h-4 text-rose-200 group-hover:scale-110 transition" />
-                  <span>
-                    {distanceKm.toLocaleString()} km across India ❤️
+            {/* Profile circles with heart connection */}
+            <div className="flex items-center justify-center gap-4 sm:gap-6 my-2">
+              {/* Your photo */}
+              <div className="flex flex-col items-center">
+                <div className="relative">
+                  <img
+                    src={currentUser.avatarUrl}
+                    alt={currentUser.name}
+                    className="w-14 h-14 sm:w-16 sm:h-16 rounded-full object-cover border-2 border-white shadow-md ring-2 ring-rose-400/40"
+                  />
+                  <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-1.5 py-0.2 rounded-full bg-white text-rose-700 text-[9px] font-black shadow-2xs whitespace-nowrap">
+                    You
                   </span>
-                  <span className="text-[10px] bg-white/25 px-1.5 py-0.2 rounded-full font-bold ml-1">
-                    Live
-                  </span>
-                </button>
-                <div className="text-[11px] text-rose-100 font-medium mt-1">
-                  {getIndianTravelComparison(distanceKm)}
                 </div>
-              </>
-            ) : (
+                <span className="text-xs font-extrabold text-white mt-2 truncate max-w-[70px]">
+                  {currentUser.name}
+                </span>
+                <span className="text-[10px] text-rose-200">
+                  {currentUser.city || 'Hyderabad'}
+                </span>
+              </div>
+
+              {/* Heart Pulse Connection */}
+              <div className="flex flex-col items-center justify-center -mt-2">
+                <div className="w-10 h-10 rounded-full bg-white/25 backdrop-blur-md flex items-center justify-center shadow-inner border border-white/40 ring-4 ring-white/10">
+                  <Heart className="w-5 h-5 text-white fill-rose-500 animate-pulse" />
+                </div>
+                <span className="text-[9px] text-rose-200 uppercase font-black tracking-wider mt-1.5">
+                  Forever
+                </span>
+              </div>
+
+              {/* Partner photo */}
+              <div className="flex flex-col items-center">
+                <div className="relative">
+                  <img
+                    src={partnerUser.avatarUrl}
+                    alt={partnerUser.name}
+                    className="w-14 h-14 sm:w-16 sm:h-16 rounded-full object-cover border-2 border-white shadow-md ring-2 ring-rose-400/40"
+                  />
+                  <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-1.5 py-0.2 rounded-full bg-white text-rose-700 text-[9px] font-black shadow-2xs whitespace-nowrap">
+                    Partner
+                  </span>
+                </div>
+                <span className="text-xs font-extrabold text-white mt-2 truncate max-w-[70px]">
+                  {partnerUser.name}
+                </span>
+                <span className="text-[10px] text-rose-200">
+                  {partnerUser.city || 'Bengaluru'}
+                </span>
+              </div>
+            </div>
+
+            {/* Bottom Distance & GPS Pill */}
+            <div className="mt-3 pt-2.5 border-t border-white/15 flex items-center justify-between text-xs">
               <button
+                type="button"
                 onClick={() => setShowLocationDialog(true)}
-                className="flex items-center gap-1.5 text-xs text-rose-100 bg-white/15 hover:bg-white/25 px-3.5 py-1.5 rounded-full transition"
+                className="inline-flex items-center gap-1.5 bg-white/20 hover:bg-white/30 text-white px-3 py-1 rounded-full text-[11px] font-bold transition active:scale-95 cursor-pointer truncate mr-2"
               >
-                <MapPin className="w-3.5 h-3.5 opacity-90" />
-                <span>
-                  {!currentUser.shareLocation
-                    ? 'Your live location paused — Click to enable'
-                    : `Waiting for ${partnerUser.name} to share location`}
+                <MapPin className="w-3.5 h-3.5 text-rose-300 shrink-0" />
+                <span className="truncate">
+                  {bothShareLocation
+                    ? `${distanceKm.toLocaleString()} km apart`
+                    : 'Location radar'}
                 </span>
               </button>
-            )}
 
-            {/* Cities / Locations & Manage Trigger */}
-            <div className="text-[11px] text-rose-200 mt-1 font-semibold flex items-center gap-1.5">
-              <span>{currentUser.city || 'Hyderabad'}</span>
-              <span>⇄</span>
-              <span>{partnerUser.city || 'Bengaluru'}</span>
               <button
+                type="button"
                 onClick={() => setShowLocationDialog(true)}
-                className="ml-1 text-[10px] bg-white/20 hover:bg-white/30 text-white px-2 py-0.5 rounded-full font-bold transition flex items-center gap-1"
+                className="text-[10px] font-bold text-rose-100 hover:text-white bg-white/15 px-2 py-0.5 rounded-full transition cursor-pointer shrink-0"
               >
-                <Compass className="w-3 h-3" />
-                <span>Manage GPS</span>
+                View Map ↗
               </button>
             </div>
           </div>
         </div>
-      </div>
+
+        {/* Quick Actions 2-Column Mobile Grid */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between px-1">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+              <span>⚡</span>
+              <span>Quick Actions</span>
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2.5">
+            {/* 1. Send Message */}
+            <button
+              type="button"
+              onClick={() => setActiveTab('chat')}
+              className="p-3.5 rounded-2xl bg-white hover:bg-rose-50/50 border border-rose-100 shadow-2xs text-left transition tap-bounce group cursor-pointer flex flex-col justify-between min-h-[74px]"
+            >
+              <div className="flex items-center justify-between">
+                <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center group-hover:scale-110 transition">
+                  <MessageCircle className="w-4 h-4" />
+                </div>
+                <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded-md">Chat</span>
+              </div>
+              <div>
+                <div className="font-extrabold text-xs text-slate-800">Send Message</div>
+                <div className="text-[10px] text-slate-400 truncate">Private messenger</div>
+              </div>
+            </button>
+
+            {/* 2. Live Location */}
+            <button
+              type="button"
+              onClick={() => setShowLocationDialog(true)}
+              className="p-3.5 rounded-2xl bg-white hover:bg-rose-50/50 border border-rose-100 shadow-2xs text-left transition tap-bounce group cursor-pointer flex flex-col justify-between min-h-[74px]"
+            >
+              <div className="flex items-center justify-between">
+                <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition">
+                  <MapPin className="w-4 h-4" />
+                </div>
+                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-md">GPS</span>
+              </div>
+              <div>
+                <div className="font-extrabold text-xs text-slate-800">Live Location</div>
+                <div className="text-[10px] text-slate-400 truncate">{bothShareLocation ? `${distanceKm} km radar` : 'Manage sharing'}</div>
+              </div>
+            </button>
+
+            {/* 3. Couple Games */}
+            <button
+              type="button"
+              onClick={() => setActiveTab('connect')}
+              className="p-3.5 rounded-2xl bg-white hover:bg-rose-50/50 border border-rose-100 shadow-2xs text-left transition tap-bounce group cursor-pointer flex flex-col justify-between min-h-[74px]"
+            >
+              <div className="flex items-center justify-between">
+                <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center group-hover:scale-110 transition">
+                  <Heart className="w-4 h-4 fill-purple-600" />
+                </div>
+                <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded-md">Fun</span>
+              </div>
+              <div>
+                <div className="font-extrabold text-xs text-slate-800">Couple Games</div>
+                <div className="text-[10px] text-slate-400 truncate">Quizzes & Truth/Dare</div>
+              </div>
+            </button>
+
+            {/* 4. Add Memory */}
+            <button
+              type="button"
+              onClick={() => setActiveTab('memories')}
+              className="p-3.5 rounded-2xl bg-white hover:bg-rose-50/50 border border-rose-100 shadow-2xs text-left transition tap-bounce group cursor-pointer flex flex-col justify-between min-h-[74px]"
+            >
+              <div className="flex items-center justify-between">
+                <div className="w-8 h-8 rounded-xl bg-pink-50 text-pink-600 flex items-center justify-center group-hover:scale-110 transition">
+                  <Calendar className="w-4 h-4" />
+                </div>
+                <span className="text-[10px] font-bold text-pink-700 bg-pink-50 px-1.5 py-0.5 rounded-md">Story</span>
+              </div>
+              <div>
+                <div className="font-extrabold text-xs text-slate-800">Add Memory</div>
+                <div className="text-[10px] text-slate-400 truncate">Photos & milestones</div>
+              </div>
+            </button>
+
+            {/* 5. Love Companion */}
+            <button
+              type="button"
+              onClick={() => setActiveTab('ai')}
+              className="p-3.5 rounded-2xl bg-white hover:bg-rose-50/50 border border-rose-100 shadow-2xs text-left transition tap-bounce group cursor-pointer flex flex-col justify-between min-h-[74px]"
+            >
+              <div className="flex items-center justify-between">
+                <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center group-hover:scale-110 transition">
+                  <Sparkles className="w-4 h-4" />
+                </div>
+                <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-md">AI</span>
+              </div>
+              <div>
+                <div className="font-extrabold text-xs text-slate-800">Love Companion</div>
+                <div className="text-[10px] text-slate-400 truncate">Date ideas & notes</div>
+              </div>
+            </button>
+
+            {/* 6. Emergency SOS */}
+            <button
+              type="button"
+              onClick={() => setShowLocationDialog(true)}
+              className="p-3.5 rounded-2xl bg-red-50/60 hover:bg-red-50 border border-red-200/80 shadow-2xs text-left transition tap-bounce group cursor-pointer flex flex-col justify-between min-h-[74px]"
+            >
+              <div className="flex items-center justify-between">
+                <div className="w-8 h-8 rounded-xl bg-red-100 text-red-600 flex items-center justify-center group-hover:scale-110 transition">
+                  <ShieldCheck className="w-4 h-4" />
+                </div>
+                <span className="text-[10px] font-bold text-red-700 bg-red-100 px-1.5 py-0.5 rounded-md">Safety</span>
+              </div>
+              <div>
+                <div className="font-extrabold text-xs text-red-900">Safety & SOS</div>
+                <div className="text-[10px] text-red-600 truncate">Emergency center</div>
+              </div>
+            </button>
+          </div>
+        </div>
 
       {/* Two-Person Live Location Geoapify Map */}
       <LiveLocationMap />
