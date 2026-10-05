@@ -90,12 +90,17 @@ export interface ChatMessage {
   senderId: string;
   senderName: string;
   text: string;
-  type?: 'text' | 'image' | 'video' | 'voice' | 'love_tap';
+  type?: 'text' | 'image' | 'video' | 'voice' | 'love_tap' | 'call';
   status?: 'sent' | 'delivered' | 'read';
   timestamp?: any;
   mediaUrl?: string;
-  mediaType?: 'image' | 'video' | 'voice' | 'love_tap';
+  mediaType?: 'image' | 'video' | 'voice' | 'love_tap' | 'call';
   voiceDurationSec?: number;
+  callData?: {
+    mode: 'voice' | 'video';
+    durationSec: number;
+    status: 'completed' | 'missed';
+  };
   replyTo?: {
     id: string;
     senderName: string;

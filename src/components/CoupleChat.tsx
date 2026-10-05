@@ -24,6 +24,10 @@ import {
   Play,
   Pause,
   Loader2,
+  Phone,
+  PhoneOff,
+  PhoneCall,
+  MoreVertical,
 } from 'lucide-react';
 import { readFileAsDataUrl } from '../utils/fileUtils';
 import { isPartnerSleeping } from '../utils/distance';
@@ -36,6 +40,7 @@ import {
   RecordingSession,
 } from '../utils/audioNotes';
 import { MicrophonePermissionModal } from './MicrophonePermissionModal';
+import { CallModal } from './CallModal';
 
 export const CoupleChat: React.FC = () => {
   const {
@@ -71,6 +76,48 @@ export const CoupleChat: React.FC = () => {
   const [isSending, setIsSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [showMicPermissionModal, setShowMicPermissionModal] = useState(false);
+
+  // In-Chat Voice & Video Call State
+  const [isCallModalOpen, setIsCallModalOpen] = useState(false);
+  const [callMode, setCallMode] = useState<'voice' | 'video'>('voice');
+  const [showChatOptionsMenu, setShowChatOptionsMenu] = useState(false);
+
+  const handleStartCall = (mode: 'voice' | 'video') => {
+    setCallMode(mode);
+    setIsCallModalOpen(true);
+  };
+
+  const handleCallEnded = async ({
+    mode,
+    durationSec,
+  }: {
+    mode: 'voice' | 'video';
+    durationSec: number;
+  }) => {
+    const durationStr =
+      durationSec > 0
+        ? `${Math.floor(durationSec / 60)}m ${durationSec % 60}s`
+        : 'Ringing (No answer)';
+    const callTitle = mode === 'video' ? '📹 Video Call' : '📞 Voice Call';
+    const text = `${callTitle} · ${durationStr}`;
+
+    try {
+      await sendMessage(
+        text,
+        undefined,
+        'call',
+        undefined,
+        undefined,
+        {
+          mode,
+          durationSec,
+          status: durationSec > 0 ? 'completed' : 'missed',
+        }
+      );
+    } catch (err) {
+      console.debug('Call log save note:', err);
+    }
+  };
 
   const partnerSleeping = isPartnerSleeping(
     partnerUser.timeZone || 'Asia/Kolkata',
@@ -336,32 +383,94 @@ export const CoupleChat: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5">
-          {/* Clear Chat Button */}
-          {messages.length > 0 && (
-            <button
-              onClick={() => setShowClearConfirmModal(true)}
-              className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-red-600 bg-slate-50 hover:bg-red-50 px-2.5 py-1 rounded-xl font-semibold transition border border-slate-200/80 hover:border-red-200 cursor-pointer shadow-2xs"
-              title="Clear all messages in chat"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              <span>Clear Chat</span>
-            </button>
-          )}
-
-          {/* Quick Love Ping button inside chat */}
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* Voice Call Button */}
           <button
-            onClick={() => {
-              setIsPartnerTyping(true);
-              setTimeout(() => {
-                setIsPartnerTyping(false);
-              }, 2500);
-            }}
-            className="text-[11px] text-rose-600 bg-rose-50 hover:bg-rose-100 px-2.5 py-1 rounded-xl font-semibold transition cursor-pointer"
-            title="Simulate partner typing"
+            type="button"
+            onClick={() => handleStartCall('voice')}
+            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-600 border border-rose-200/80 flex items-center justify-center transition active:scale-95 shadow-2xs cursor-pointer tap-bounce"
+            title={`Voice Call with ${partnerUser.name}`}
+            aria-label="Voice Call"
           >
-            Simulate Typing
+            <Phone className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
           </button>
+
+          {/* Video Call Button */}
+          <button
+            type="button"
+            onClick={() => handleStartCall('video')}
+            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-gradient-to-tr from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 text-white flex items-center justify-center transition active:scale-95 shadow-xs shadow-rose-500/25 cursor-pointer tap-bounce"
+            title={`Video Call with ${partnerUser.name}`}
+            aria-label="Video Call"
+          >
+            <Video className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+          </button>
+
+          {/* More Chat Actions Dropdown Menu */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowChatOptionsMenu(!showChatOptionsMenu)}
+              className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center transition border border-slate-200/80 cursor-pointer active:scale-95"
+              title="More chat options"
+              aria-label="More options"
+            >
+              <MoreVertical className="w-4 h-4" />
+            </button>
+
+            {showChatOptionsMenu && (
+              <div className="absolute right-0 top-full mt-1.5 w-48 bg-white/95 backdrop-blur-xl border border-rose-100 rounded-2xl shadow-xl py-1.5 z-30 animate-in fade-in zoom-in-95">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowChatOptionsMenu(false);
+                    handleStartCall('voice');
+                  }}
+                  className="w-full px-3.5 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-rose-50 hover:text-rose-600 flex items-center gap-2 transition cursor-pointer"
+                >
+                  <Phone className="w-3.5 h-3.5 text-rose-500" />
+                  <span>Start Voice Call</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowChatOptionsMenu(false);
+                    handleStartCall('video');
+                  }}
+                  className="w-full px-3.5 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-rose-50 hover:text-rose-600 flex items-center gap-2 transition cursor-pointer"
+                >
+                  <Video className="w-3.5 h-3.5 text-rose-500" />
+                  <span>Start Video Call</span>
+                </button>
+                <div className="h-px bg-slate-100 my-1" />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowChatOptionsMenu(false);
+                    setIsPartnerTyping(true);
+                    setTimeout(() => setIsPartnerTyping(false), 2500);
+                  }}
+                  className="w-full px-3.5 py-2 text-left text-xs font-semibold text-slate-600 hover:bg-slate-50 flex items-center gap-2 transition cursor-pointer"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                  <span>Simulate Partner Typing</span>
+                </button>
+                {messages.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowChatOptionsMenu(false);
+                      setShowClearConfirmModal(true);
+                    }}
+                    className="w-full px-3.5 py-2 text-left text-xs font-semibold text-red-600 hover:bg-red-50 flex items-center gap-2 transition cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                    <span>Clear Chat History</span>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -598,8 +707,58 @@ export const CoupleChat: React.FC = () => {
                     </button>
                   )}
 
+                  {/* Call Log Payload */}
+                  {(msg.type === 'call' || msg.mediaType === 'call') && (
+                    <div className="py-1">
+                      <div className="flex items-center gap-2.5">
+                        <div
+                          className={`w-9 h-9 rounded-2xl flex items-center justify-center shrink-0 shadow-2xs ${
+                            isMe ? 'bg-white/20 text-white' : 'bg-rose-100 text-rose-600'
+                          }`}
+                        >
+                          {msg.callData?.mode === 'video' ? (
+                            <Video className="w-4.5 h-4.5" />
+                          ) : (
+                            <Phone className="w-4.5 h-4.5" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-[110px]">
+                          <div className="font-bold text-xs sm:text-sm leading-tight flex items-center gap-1">
+                            <span>{msg.callData?.mode === 'video' ? 'Video Call' : 'Voice Call'}</span>
+                            {msg.callData?.status === 'missed' && (
+                              <span className="text-[10px] text-red-300 font-normal">Missed</span>
+                            )}
+                          </div>
+                          <div
+                            className={`text-[11px] font-medium mt-0.5 ${
+                              isMe ? 'text-rose-100' : 'text-slate-500'
+                            }`}
+                          >
+                            {msg.callData?.durationSec && msg.callData.durationSec > 0
+                              ? `Duration: ${Math.floor(msg.callData.durationSec / 60)}m ${
+                                  msg.callData.durationSec % 60
+                                }s`
+                              : msg.text}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleStartCall(msg.callData?.mode || 'voice')}
+                          className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition active:scale-95 cursor-pointer shadow-2xs ${
+                            isMe
+                              ? 'bg-white text-rose-600 hover:bg-rose-50'
+                              : 'bg-rose-600 text-white hover:bg-rose-700'
+                          }`}
+                          title={`Call back with ${msg.callData?.mode || 'voice'}`}
+                        >
+                          Call Back
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Normal Text */}
-                  {msg.mediaType !== 'love_tap' && (
+                  {msg.mediaType !== 'love_tap' && msg.mediaType !== 'call' && msg.type !== 'call' && (
                     <p className="leading-relaxed whitespace-pre-wrap break-words">{msg.text}</p>
                   )}
 
@@ -1142,6 +1301,16 @@ export const CoupleChat: React.FC = () => {
           </div>
         </div>
       )}
+      {/* Voice & Video Call Modal */}
+      <CallModal
+        isOpen={isCallModalOpen}
+        mode={callMode}
+        partnerUser={partnerUser}
+        currentUser={currentUser}
+        onClose={() => setIsCallModalOpen(false)}
+        onCallEnded={handleCallEnded}
+        onSwitchMode={(newMode) => setCallMode(newMode)}
+      />
     </div>
   );
 };

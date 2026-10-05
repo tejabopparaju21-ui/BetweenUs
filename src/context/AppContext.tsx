@@ -88,9 +88,10 @@ interface AppContextType {
   sendMessage: (
     text: string,
     mediaUrl?: string,
-    mediaType?: 'image' | 'video' | 'voice' | 'love_tap',
+    mediaType?: 'image' | 'video' | 'voice' | 'love_tap' | 'call',
     voiceDurationSec?: number,
-    replyTo?: { id: string; senderName: string; text: string }
+    replyTo?: { id: string; senderName: string; text: string },
+    callData?: { mode: 'voice' | 'video'; durationSec: number; status: 'completed' | 'missed' }
   ) => Promise<void> | void;
   deleteMessage: (id: string) => void;
   clearChatMessages: () => Promise<void>;
@@ -1045,9 +1046,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     async (
       text: string,
       mediaUrl?: string,
-      mediaType?: 'image' | 'video' | 'voice' | 'love_tap',
+      mediaType?: 'image' | 'video' | 'voice' | 'love_tap' | 'call',
       voiceDurationSec?: number,
-      replyTo?: { id: string; senderName: string; text: string }
+      replyTo?: { id: string; senderName: string; text: string },
+      callData?: { mode: 'voice' | 'video'; durationSec: number; status: 'completed' | 'missed' }
     ) => {
       if (!firebaseUser) {
         const authErr = 'Please sign in to your couple space before sending messages.';
@@ -1060,7 +1062,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         throw new Error(coupleErr);
       }
       const cleanText = text.trim();
-      if (!cleanText && !mediaUrl) {
+      if (!cleanText && !mediaUrl && !callData) {
         throw new Error('Message cannot be empty');
       }
 
@@ -1076,6 +1078,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         mediaUrl: mediaUrl || undefined,
         mediaType: mediaType || undefined,
         voiceDurationSec: voiceDurationSec || undefined,
+        callData: callData || undefined,
         replyTo: replyTo || undefined,
         reactions: [],
         readBy: [firebaseUser.uid],
