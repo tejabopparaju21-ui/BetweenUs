@@ -18,6 +18,7 @@ import { CallModal } from './components/CallModal';
 
 import { AuthScreen } from './components/AuthScreen';
 import { CouplePairingView } from './components/CouplePairingView';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 function MainAppContent() {
   const { activeTab, firebaseUser, isDemoMode, isPartnerPaired, exitDemoMode } = useApp();
@@ -90,8 +91,10 @@ function MainAppContent() {
 
 export default function App() {
   return (
-    <AppProvider>
-      <MainAppContent />
-    </AppProvider>
+    <ErrorBoundary>
+      <AppProvider>
+        <MainAppContent />
+      </AppProvider>
+    </ErrorBoundary>
   );
 }

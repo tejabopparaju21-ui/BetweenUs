@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import {
   Phone,
@@ -80,7 +80,7 @@ export const CallModal: React.FC = () => {
   const answerCreatedRef = useRef<boolean>(false);
 
   const mySessionId = useMemo(() => getCallDeviceSessionId(), []);
-  const myUid = currentUser.id || '';
+  const myUid = currentUser?.id || '';
 
   // 100% reliable 2-device role resolution:
   // - Device that initiated the call is ALWAYS the caller
