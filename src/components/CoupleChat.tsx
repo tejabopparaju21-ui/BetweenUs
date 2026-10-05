@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
-import { ChatMessage } from '../types';
+import { ChatMessage, MessageReaction } from '../types';
 import {
   Send,
   Image as ImageIcon,
@@ -103,10 +103,38 @@ export const CoupleChat: React.FC = () => {
   const [playbackTime, setPlaybackTime] = useState<number>(0);
   const [playbackPercent, setPlaybackPercent] = useState<number>(0);
 
+  // Cleanly deduplicate call log messages from chat history
+  const displayMessages = useMemo<ChatMessage[]>(() => {
+    const renderedCallCards: { time: number; mode?: string; text: string }[] = [];
+
+    return messages.filter((msg: ChatMessage) => {
+      if (msg.type !== 'call' && msg.mediaType !== 'call') return true;
+
+      const msgTime = new Date(msg.createdAt).getTime();
+      const mode = msg.callData?.mode;
+      const text = msg.text;
+
+      // Check if a matching call card was already rendered within 3 minutes
+      const isDuplicate = renderedCallCards.some((card) => {
+        const timeDiff = Math.abs(msgTime - card.time);
+        const isSameText = card.text === text;
+        const isSameMode = card.mode && mode && card.mode === mode;
+        return timeDiff < 180000 && (isSameText || isSameMode);
+      });
+
+      if (isDuplicate) {
+        return false;
+      }
+
+      renderedCallCards.push({ time: msgTime, mode, text });
+      return true;
+    });
+  }, [messages]);
+
   // Auto-scroll to bottom on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isPartnerTyping]);
+  }, [displayMessages, isPartnerTyping]);
 
   // Cleanup active audio and recording on unmount
   useEffect(() => {
@@ -506,7 +534,7 @@ export const CoupleChat: React.FC = () => {
         </div>
 
         {/* Empty Chat State */}
-        {messages.length === 0 && (
+        {displayMessages.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
             <div className="w-14 h-14 rounded-full bg-rose-100/70 flex items-center justify-center mb-3 text-rose-500 shadow-inner">
               <Heart className="w-7 h-7 fill-rose-500 text-rose-500 animate-pulse" />
@@ -518,7 +546,7 @@ export const CoupleChat: React.FC = () => {
           </div>
         )}
 
-        {messages.map((msg) => {
+        {displayMessages.map((msg: ChatMessage) => {
           const isMe = msg.senderId === currentUser.id;
 
           return (
@@ -718,6 +746,16 @@ export const CoupleChat: React.FC = () => {
                         >
                           Call Back
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteMessage(msg.id)}
+                          className={`p-1 rounded-lg transition active:scale-90 opacity-70 hover:opacity-100 cursor-pointer ${
+                            isMe ? 'text-white/80 hover:text-white' : 'text-slate-400 hover:text-red-500'
+                          }`}
+                          title="Delete call log from chat"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     </div>
                   )}
@@ -775,7 +813,7 @@ export const CoupleChat: React.FC = () => {
                       isMe ? 'mr-1' : 'ml-1'
                     }`}
                   >
-                    {msg.reactions.map((r, i) => (
+                    {msg.reactions.map((r: MessageReaction, i: number) => (
                       <span key={i} className="leading-none">
                         {r.emoji}
                       </span>
@@ -817,7 +855,7 @@ export const CoupleChat: React.FC = () => {
                   >
                     <Reply className="w-3.5 h-3.5" />
                   </button>
-                  {isMe && (
+                  {(isMe || msg.type === 'call' || msg.mediaType === 'call') && (
                     <button
                       onClick={() => deleteMessage(msg.id)}
                       className="text-red-400 hover:text-red-600 p-0.5"

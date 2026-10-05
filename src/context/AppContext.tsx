@@ -611,6 +611,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Real-Time Active Call Session (between both partners' devices)
   const [activeCall, setActiveCall] = useState<CallSession | null>(null);
+  const recordedCallLogsRef = useRef<Set<string>>(new Set());
+  const activeCallRef = useRef<CallSession | null>(null);
+  activeCallRef.current = activeCall;
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -1105,6 +1108,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const cleanText = text.trim();
       if (!cleanText && !mediaUrl && !callData) {
         throw new Error('Message cannot be empty');
+      }
+
+      // Safeguard: Deduplicate call cards sent within 15 seconds
+      if (mediaType === 'call') {
+        const isDuplicateCallMsg = messages.some((m) => {
+          if (m.type !== 'call' && m.mediaType !== 'call') return false;
+          const timeDiff = Math.abs(Date.now() - new Date(m.createdAt).getTime());
+          return (
+            timeDiff < 15000 &&
+            (m.text === cleanText ||
+              (m.callData?.durationSec === callData?.durationSec &&
+                m.callData?.mode === callData?.mode))
+          );
+        });
+        if (isDuplicateCallMsg) {
+          console.debug('Prevented duplicate call message logging:', cleanText);
+          return;
+        }
       }
 
       const newMsgId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
@@ -2213,19 +2234,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [activeCall, couple?.id, currentUser.id, broadcastChannel, saveAndBroadcast]);
 
   const endActiveCall = useCallback(async () => {
-    if (!activeCall) return;
-    const durationSec = activeCall.connectedAt
-      ? Math.max(0, Math.floor((Date.now() - new Date(activeCall.connectedAt).getTime()) / 1000))
+    const current = activeCallRef.current;
+    if (!current) return;
+    // Guard: Prevent double-ending or loop when call is already ended/declined
+    if (current.status === 'ended' || current.status === 'declined') return;
+
+    const durationSec = current.connectedAt
+      ? Math.max(0, Math.floor((Date.now() - new Date(current.connectedAt).getTime()) / 1000))
       : 0;
 
     const updated: CallSession = {
-      ...activeCall,
+      ...current,
       status: 'ended',
       endedAt: new Date().toISOString(),
       endedBy: currentUser.id,
       durationSec,
     };
 
+    activeCallRef.current = updated;
     setActiveCall(updated);
     saveAndBroadcast({ activeCall: updated });
 
@@ -2240,46 +2266,61 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       await syncActiveCallToFirestore(couple.id, updated);
     }
 
-    // Automatically record sweet call log in chat
-    try {
-      const durationStr =
-        durationSec > 0
-          ? `${Math.floor(durationSec / 60)}m ${durationSec % 60}s`
-          : activeCall.status === 'connected' ? '0m 1s' : 'Missed Call';
-      const callTitle = activeCall.mode === 'video' ? '📹 Video Call' : '📞 Voice Call';
-      await sendMessage(
-        `${callTitle} · ${durationStr}`,
-        undefined,
-        'call',
-        undefined,
-        undefined,
-        {
-          mode: activeCall.mode,
-          durationSec,
-          status: durationSec > 0 ? 'completed' : 'missed',
-        }
-      );
-    } catch (logErr) {
-      console.debug('Call log auto-save notice:', logErr);
+    // Automatically record sweet call log in chat - EXACTLY ONCE per call ID
+    const callLogKey = `logged_call_${current.id}`;
+    const alreadyLoggedSession =
+      typeof sessionStorage !== 'undefined' ? sessionStorage.getItem(callLogKey) : null;
+    const alreadyLoggedMemory = recordedCallLogsRef.current.has(current.id);
+
+    if (!alreadyLoggedSession && !alreadyLoggedMemory) {
+      recordedCallLogsRef.current.add(current.id);
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.setItem(callLogKey, 'true');
+      }
+
+      try {
+        const durationStr =
+          durationSec > 0
+            ? `${Math.floor(durationSec / 60)}m ${durationSec % 60}s`
+            : current.status === 'connected' ? '0m 1s' : 'Missed Call';
+        const callTitle = current.mode === 'video' ? '📹 Video Call' : '📞 Voice Call';
+        await sendMessage(
+          `${callTitle} · ${durationStr}`,
+          undefined,
+          'call',
+          undefined,
+          undefined,
+          {
+            mode: current.mode,
+            durationSec,
+            status: durationSec > 0 ? 'completed' : 'missed',
+          }
+        );
+      } catch (logErr) {
+        console.debug('Call log auto-save notice:', logErr);
+      }
     }
 
     // Clean up call session from Firestore after 2.5 seconds
     setTimeout(async () => {
       setActiveCall(null);
+      activeCallRef.current = null;
       saveAndBroadcast({ activeCall: null });
       if (couple?.id) {
         await syncActiveCallToFirestore(couple.id, null);
       }
     }, 2500);
-  }, [activeCall, couple?.id, currentUser.id, broadcastChannel, saveAndBroadcast, sendMessage]);
+  }, [couple?.id, currentUser.id, broadcastChannel, saveAndBroadcast, sendMessage]);
 
   const updateCallSession = useCallback(
     async (updates: Partial<CallSession>) => {
-      if (!activeCall) return;
+      const current = activeCallRef.current;
+      if (!current) return;
       const updated: CallSession = {
-        ...activeCall,
+        ...current,
         ...updates,
       };
+      activeCallRef.current = updated;
       setActiveCall(updated);
       saveAndBroadcast({ activeCall: updated });
       if (broadcastChannel) {
@@ -2292,7 +2333,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         await syncActiveCallToFirestore(couple.id, updated);
       }
     },
-    [activeCall, couple?.id, broadcastChannel, saveAndBroadcast]
+    [couple?.id, broadcastChannel, saveAndBroadcast]
   );
 
   const sendCallReaction = useCallback(

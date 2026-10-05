@@ -42,6 +42,10 @@ const ICE_SERVERS: RTCConfiguration = {
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun2.l.google.com:19302' },
+    { urls: 'stun:stun3.l.google.com:19302' },
+    { urls: 'stun:stun4.l.google.com:19302' },
+    { urls: 'stun:stun.cloudflare.com:3478' },
+    { urls: 'stun:global.stun.twilio.com:3478' },
   ],
 };
 
@@ -71,6 +75,7 @@ export const CallModal: React.FC = () => {
 
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
+  const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const ringtoneStopperRef = useRef<(() => void) | null>(null);
@@ -78,6 +83,8 @@ export const CallModal: React.FC = () => {
   const lastProcessedReactionRef = useRef<number>(0);
   const offerCreatedRef = useRef<boolean>(false);
   const answerCreatedRef = useRef<boolean>(false);
+  const localCandidatesRef = useRef<string[]>([]);
+  const appliedCandidatesRef = useRef<Set<string>>(new Set());
 
   const mySessionId = useMemo(() => getCallDeviceSessionId(), []);
   const myUid = currentUser?.id || '';
@@ -92,12 +99,19 @@ export const CallModal: React.FC = () => {
   const mode = activeCall?.mode || 'voice';
   const status = activeCall?.status || 'ended';
 
-  // Safeguard: Automatically dismiss stale lingering calls so they never auto-lift
+  // Safeguard: Automatically dismiss unanswered ringing calls after 45s timeout (NEVER on ended/declined!)
   useEffect(() => {
-    if (activeCall && isCallStale(activeCall)) {
+    if (activeCall && activeCall.status === 'ringing' && isCallStale(activeCall)) {
       endActiveCall();
     }
-  }, [activeCall, endActiveCall]);
+  }, [activeCall?.id, activeCall?.status, activeCall?.startedAt, endActiveCall]);
+
+  // Synchronize speaker mute state to remoteAudioRef
+  useEffect(() => {
+    if (remoteAudioRef.current) {
+      remoteAudioRef.current.muted = isSpeakerMuted;
+    }
+  }, [isSpeakerMuted]);
 
   // Format seconds into MM:SS
   const formatDuration = (secs: number) => {
@@ -135,9 +149,14 @@ export const CallModal: React.FC = () => {
     if (remoteVideoRef.current) {
       remoteVideoRef.current.srcObject = null;
     }
+    if (remoteAudioRef.current) {
+      remoteAudioRef.current.srcObject = null;
+    }
     setHasRemoteVideo(false);
     offerCreatedRef.current = false;
     answerCreatedRef.current = false;
+    localCandidatesRef.current = [];
+    appliedCandidatesRef.current.clear();
   }, []);
 
   // Stop any active ringtone
@@ -222,7 +241,11 @@ export const CallModal: React.FC = () => {
     const setupMediaAndWebRTC = async () => {
       try {
         const constraints: MediaStreamConstraints = {
-          audio: true,
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
           video:
             mode === 'video'
               ? {
@@ -233,7 +256,25 @@ export const CallModal: React.FC = () => {
               : false,
         };
 
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        let stream: MediaStream;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia(constraints);
+        } catch (mediaErr) {
+          console.warn('Primary media constraints failed, attempting fallback:', mediaErr);
+          if (mode === 'video') {
+            try {
+              stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+            } catch (vidErr) {
+              console.warn('Video failed, falling back to voice-only:', vidErr);
+              setPermissionNotice('Camera unavailable. Romantic voice mode active.');
+              setIsVideoOff(true);
+              stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            }
+          } else {
+            stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          }
+        }
+
         if (isCancelled) {
           stream.getTracks().forEach((t) => t.stop());
           return;
@@ -277,35 +318,46 @@ export const CallModal: React.FC = () => {
         const pc = new RTCPeerConnection(ICE_SERVERS);
         peerConnectionRef.current = pc;
 
-        // Add local tracks to WebRTC
+        // Add local tracks to WebRTC (automatically configures transceivers cleanly)
         stream.getTracks().forEach((track) => {
           pc.addTrack(track, stream);
         });
 
-        // Handle incoming remote track from partner
+        // Handle incoming remote track from partner (Voice & Video)
         pc.ontrack = (event) => {
-          if (remoteVideoRef.current && event.streams[0]) {
-            remoteVideoRef.current.srcObject = event.streams[0];
+          const remoteStream = event.streams[0] || new MediaStream([event.track]);
+          // Always play partner voice audio via remoteAudioRef
+          if (event.track.kind === 'audio' || !hasRemoteVideo) {
+            if (remoteAudioRef.current) {
+              if (remoteAudioRef.current.srcObject !== remoteStream) {
+                remoteAudioRef.current.srcObject = remoteStream;
+              }
+              remoteAudioRef.current.muted = isSpeakerMuted;
+              remoteAudioRef.current.play().catch((err) => {
+                console.debug('Autoplay remote audio notice:', err);
+              });
+            }
+          }
+          // In video mode, also attach to video canvas
+          if (remoteVideoRef.current && (event.track.kind === 'video' || mode === 'video')) {
+            remoteVideoRef.current.srcObject = remoteStream;
             setHasRemoteVideo(true);
           }
         };
 
-        // Handle local ICE candidates
+        // Handle local ICE candidates with immutable ref buffer
         pc.onicecandidate = (event) => {
-          if (event.candidate && activeCall) {
+          if (event.candidate) {
             const candStr = JSON.stringify(event.candidate);
-            if (isCaller) {
-              const prev = activeCall.iceCandidatesCaller || [];
-              if (!prev.includes(candStr)) {
+            if (!localCandidatesRef.current.includes(candStr)) {
+              localCandidatesRef.current.push(candStr);
+              if (isCaller) {
                 updateCallSession({
-                  iceCandidatesCaller: [...prev, candStr],
+                  iceCandidatesCaller: [...localCandidatesRef.current],
                 });
-              }
-            } else {
-              const prev = activeCall.iceCandidatesRecipient || [];
-              if (!prev.includes(candStr)) {
+              } else {
                 updateCallSession({
-                  iceCandidatesRecipient: [...prev, candStr],
+                  iceCandidatesRecipient: [...localCandidatesRef.current],
                 });
               }
             }
@@ -359,6 +411,17 @@ export const CallModal: React.FC = () => {
           await updateCallSession({
             sdpAnswer: JSON.stringify(answer),
           });
+
+          // Drain any caller ICE candidates that arrived before remoteDescription was set
+          const callerCandidates = activeCall.iceCandidatesCaller || [];
+          callerCandidates.forEach((candStr) => {
+            if (!appliedCandidatesRef.current.has(candStr)) {
+              appliedCandidatesRef.current.add(candStr);
+              try {
+                pc.addIceCandidate(new RTCIceCandidate(JSON.parse(candStr))).catch(() => {});
+              } catch (_) {}
+            }
+          });
         } catch (err) {
           console.debug('WebRTC recipient answer notice:', err);
         }
@@ -372,6 +435,17 @@ export const CallModal: React.FC = () => {
         try {
           const answerDesc = new RTCSessionDescription(JSON.parse(activeCall.sdpAnswer!));
           await pc.setRemoteDescription(answerDesc);
+
+          // Drain any recipient ICE candidates that arrived before remoteDescription was set
+          const recipientCandidates = activeCall.iceCandidatesRecipient || [];
+          recipientCandidates.forEach((candStr) => {
+            if (!appliedCandidatesRef.current.has(candStr)) {
+              appliedCandidatesRef.current.add(candStr);
+              try {
+                pc.addIceCandidate(new RTCIceCandidate(JSON.parse(candStr))).catch(() => {});
+              } catch (_) {}
+            }
+          });
         } catch (err) {
           console.debug('WebRTC caller apply answer notice:', err);
         }
@@ -379,17 +453,20 @@ export const CallModal: React.FC = () => {
       applyAnswer();
     }
 
-    // Apply remote ICE candidates
+    // Apply incremental remote ICE candidates once remoteDescription is set
     const remoteCandidates = isCaller
       ? activeCall.iceCandidatesRecipient || []
       : activeCall.iceCandidatesCaller || [];
 
     if (remoteCandidates.length > 0 && pc.remoteDescription) {
       remoteCandidates.forEach((candStr) => {
-        try {
-          const candidate = new RTCIceCandidate(JSON.parse(candStr));
-          pc.addIceCandidate(candidate).catch(() => {});
-        } catch (_) {}
+        if (!appliedCandidatesRef.current.has(candStr)) {
+          appliedCandidatesRef.current.add(candStr);
+          try {
+            const candidate = new RTCIceCandidate(JSON.parse(candStr));
+            pc.addIceCandidate(candidate).catch(() => {});
+          } catch (_) {}
+        }
       });
     }
   }, [activeCall?.sdpOffer, activeCall?.sdpAnswer, activeCall?.iceCandidatesCaller, activeCall?.iceCandidatesRecipient, isCaller, isRecipient]);
@@ -484,10 +561,11 @@ export const CallModal: React.FC = () => {
   const partnerAvatar = isCaller ? (activeCall.recipientAvatar || partnerUser.avatarUrl) : (activeCall.callerAvatar || partnerUser.avatarUrl);
   const partnerCity = isCaller ? (activeCall.recipientCity || partnerUser.city) : (activeCall.callerCity || partnerUser.city);
 
-  // -------------------------------------------------------------
-  // INCOMING CALL VIEW (Ringing on Recipient Phone)
-  // -------------------------------------------------------------
-  if (status === 'ringing' && isRecipient) {
+  const renderModalBody = () => {
+    // -------------------------------------------------------------
+    // INCOMING CALL VIEW (Ringing on Recipient Phone)
+    // -------------------------------------------------------------
+    if (status === 'ringing' && isRecipient) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4 animate-in fade-in duration-200">
         <div className="relative w-full max-w-sm rounded-3xl bg-gradient-to-b from-slate-900 via-rose-950/40 to-black text-white p-6 shadow-2xl border border-rose-500/30 flex flex-col items-center text-center">
@@ -547,6 +625,9 @@ export const CallModal: React.FC = () => {
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
+                    if (remoteAudioRef.current) {
+                      remoteAudioRef.current.play().catch(() => {});
+                    }
                     acceptIncomingCall();
                   }}
                   className="relative z-10 w-20 h-20 rounded-full bg-gradient-to-tr from-emerald-500 via-teal-500 to-emerald-400 hover:from-emerald-600 hover:to-teal-600 text-white flex items-center justify-center shadow-2xl shadow-emerald-500/60 ring-4 ring-emerald-400/50 transition active:scale-90 cursor-pointer tap-bounce animate-bounce"
@@ -997,6 +1078,27 @@ export const CallModal: React.FC = () => {
           </div>
         </div>
       </div>
+    </div>
+  );
+};
+
+  return (
+    <div
+      onClick={() => {
+        if (remoteAudioRef.current) {
+          remoteAudioRef.current.play().catch(() => {});
+        }
+      }}
+      className="contents"
+    >
+      {/* Permanent audio element for real-time remote audio in voice and video calls */}
+      <audio
+        ref={remoteAudioRef}
+        autoPlay
+        playsInline
+        style={{ position: 'fixed', top: -9999, left: -9999, width: 1, height: 1, opacity: 0.01, pointerEvents: 'none' }}
+      />
+      {renderModalBody()}
     </div>
   );
 };
