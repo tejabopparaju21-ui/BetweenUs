@@ -14,6 +14,7 @@ import { AICompanion } from './components/AICompanion';
 import { SettingsSection } from './components/SettingsSection';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { EmergencyAlertModal } from './components/EmergencyAlertModal';
+import { CallModal } from './components/CallModal';
 
 import { AuthScreen } from './components/AuthScreen';
 import { CouplePairingView } from './components/CouplePairingView';
@@ -72,6 +73,7 @@ function MainAppContent() {
       )}
       <OfflineIndicator />
       <EmergencyAlertModal />
+      <CallModal />
       <Navigation />
 
       <main className="flex-1 w-full max-w-md sm:max-w-2xl md:max-w-4xl lg:max-w-5xl mx-auto relative z-10 transition-all">

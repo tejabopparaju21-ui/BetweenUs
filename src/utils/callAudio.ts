@@ -90,6 +90,91 @@ export function startCallingRingtone(): () => void {
 }
 
 /**
+ * Starts an incoming calling ringtone loop (cheerful couple melody) on recipient phone
+ * Returns a cancel/stop function.
+ */
+export function startIncomingRingtone(): () => void {
+  let isStopped = false;
+  let timerId: number | null = null;
+  const activeNodes: (OscillatorNode | GainNode)[] = [];
+
+  const playTune = () => {
+    if (isStopped) return;
+    try {
+      const ctx = getAudioContext();
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+      }
+
+      const now = ctx.currentTime;
+      const melody = [
+        { freq: 587.33, t: 0, d: 0.18 },      // D5
+        { freq: 659.25, t: 0.2, d: 0.18 },    // E5
+        { freq: 783.99, t: 0.4, d: 0.25 },    // G5
+        { freq: 880.0, t: 0.7, d: 0.35 },     // A5
+        { freq: 783.99, t: 1.1, d: 0.18 },    // G5
+        { freq: 880.0, t: 1.3, d: 0.35 },     // A5
+      ];
+
+      melody.forEach(({ freq, t, d }) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        const noteTime = now + t;
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, noteTime);
+
+        gain.gain.setValueAtTime(0.0001, noteTime);
+        gain.gain.linearRampToValueAtTime(0.14, noteTime + 0.03);
+        gain.gain.exponentialRampToValueAtTime(0.0001, noteTime + d);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.start(noteTime);
+        osc.stop(noteTime + d + 0.05);
+
+        activeNodes.push(osc, gain);
+      });
+
+      // Cleanup
+      setTimeout(() => {
+        activeNodes.forEach((node) => {
+          try {
+            node.disconnect();
+          } catch (_) {}
+        });
+      }, 1900);
+    } catch (e) {
+      console.warn('Incoming ringtone error:', e);
+    }
+
+    if (!isStopped) {
+      timerId = window.setTimeout(playTune, 2500);
+    }
+  };
+
+  playTune();
+
+  return () => {
+    isStopped = true;
+    if (timerId !== null) {
+      clearTimeout(timerId);
+      timerId = null;
+    }
+    activeNodes.forEach((node) => {
+      try {
+        if ('stop' in node && typeof (node as any).stop === 'function') {
+          (node as any).stop();
+        }
+        node.disconnect();
+      } catch (_) {}
+    });
+    activeNodes.length = 0;
+  };
+}
+
+/**
  * Plays an upbeat harmonic chime when partner answers the call
  */
 export function playCallConnectedSound(): void {

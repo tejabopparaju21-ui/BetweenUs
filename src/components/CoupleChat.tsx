@@ -40,7 +40,6 @@ import {
   RecordingSession,
 } from '../utils/audioNotes';
 import { MicrophonePermissionModal } from './MicrophonePermissionModal';
-import { CallModal } from './CallModal';
 
 export const CoupleChat: React.FC = () => {
   const {
@@ -58,6 +57,7 @@ export const CoupleChat: React.FC = () => {
     chatError,
     firebaseUser,
     loginWithGoogle,
+    startCall,
   } = useApp();
 
   const [inputVal, setInputVal] = useState('');
@@ -78,45 +78,10 @@ export const CoupleChat: React.FC = () => {
   const [showMicPermissionModal, setShowMicPermissionModal] = useState(false);
 
   // In-Chat Voice & Video Call State
-  const [isCallModalOpen, setIsCallModalOpen] = useState(false);
-  const [callMode, setCallMode] = useState<'voice' | 'video'>('voice');
   const [showChatOptionsMenu, setShowChatOptionsMenu] = useState(false);
 
   const handleStartCall = (mode: 'voice' | 'video') => {
-    setCallMode(mode);
-    setIsCallModalOpen(true);
-  };
-
-  const handleCallEnded = async ({
-    mode,
-    durationSec,
-  }: {
-    mode: 'voice' | 'video';
-    durationSec: number;
-  }) => {
-    const durationStr =
-      durationSec > 0
-        ? `${Math.floor(durationSec / 60)}m ${durationSec % 60}s`
-        : 'Ringing (No answer)';
-    const callTitle = mode === 'video' ? '📹 Video Call' : '📞 Voice Call';
-    const text = `${callTitle} · ${durationStr}`;
-
-    try {
-      await sendMessage(
-        text,
-        undefined,
-        'call',
-        undefined,
-        undefined,
-        {
-          mode,
-          durationSec,
-          status: durationSec > 0 ? 'completed' : 'missed',
-        }
-      );
-    } catch (err) {
-      console.debug('Call log save note:', err);
-    }
+    startCall(mode);
   };
 
   const partnerSleeping = isPartnerSleeping(
@@ -1301,16 +1266,6 @@ export const CoupleChat: React.FC = () => {
           </div>
         </div>
       )}
-      {/* Voice & Video Call Modal */}
-      <CallModal
-        isOpen={isCallModalOpen}
-        mode={callMode}
-        partnerUser={partnerUser}
-        currentUser={currentUser}
-        onClose={() => setIsCallModalOpen(false)}
-        onCallEnded={handleCallEnded}
-        onSwitchMode={(newMode) => setCallMode(newMode)}
-      />
     </div>
   );
 };

@@ -27,7 +27,7 @@ import {
   User as FirebaseUser,
 } from 'firebase/auth';
 import { db, auth, googleProvider } from './firebase';
-import { ChatMessage, MoodEntry, MemoryItem, Couple, UserProfile, LocationData, EmergencyAlert } from '../types';
+import { ChatMessage, MoodEntry, MemoryItem, Couple, UserProfile, LocationData, EmergencyAlert, CallSession } from '../types';
 
 let currentAuthUser: FirebaseUser | null = null;
 let isAuthReady = false;
@@ -938,5 +938,29 @@ export function listenToCoupleMemories(
   } catch (err) {
     console.debug('Failed to set up memories listener:', err);
     return () => {};
+  }
+}
+
+
+/**
+ * Sync Active Call Session to Firestore Couple Document (Real-Time 2-Device Calling)
+ */
+export async function syncActiveCallToFirestore(
+  coupleId: string,
+  call: CallSession | null
+): Promise<void> {
+  if (!coupleId) return;
+  try {
+    const coupleRef = doc(db, 'couples', coupleId);
+    await setDoc(
+      coupleRef,
+      {
+        activeCall: call ? sanitizeForFirestore(call) : null,
+        updatedAt: new Date().toISOString(),
+      },
+      { merge: true }
+    );
+  } catch (err) {
+    console.warn('syncActiveCallToFirestore notice:', err);
   }
 }

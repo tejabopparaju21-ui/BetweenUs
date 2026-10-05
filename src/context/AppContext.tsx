@@ -21,6 +21,7 @@ import {
   EmergencyContact,
   LocationData,
   EmergencyAlert,
+  CallSession,
 } from '../types';
 import {
   syncCoupleToFirestore,
@@ -45,6 +46,7 @@ import {
   subscribeToAuth,
   syncPartnerLocationToFirestore,
   syncEmergencyAlertToFirestore,
+  syncActiveCallToFirestore,
   loginWithGoogle as fbLoginWithGoogle,
   loginWithEmail as fbLoginWithEmail,
   registerWithEmail as fbRegisterWithEmail,
@@ -141,6 +143,15 @@ interface AppContextType {
   triggerEmergencyAlert: (customMessage?: string) => Promise<void>;
   acknowledgeEmergencyAlert: (alertId: string) => Promise<void>;
   cancelEmergencyAlert: (alertId: string) => Promise<void>;
+
+  // Real-Time 2-Device Video & Voice Calling
+  activeCall: CallSession | null;
+  startCall: (mode: 'voice' | 'video') => Promise<void>;
+  acceptIncomingCall: () => Promise<void>;
+  declineIncomingCall: () => Promise<void>;
+  endActiveCall: () => Promise<void>;
+  updateCallSession: (updates: Partial<CallSession>) => Promise<void>;
+  sendCallReaction: (emoji: string) => Promise<void>;
 
   // Firebase Real-Time Cloud Integration & Multi-Tenant Pairing
   firebaseUser: FirebaseUser | null;
@@ -597,6 +608,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Emergency SOS & Partner Phone Siren state
   const [activeEmergencyAlert, setActiveEmergencyAlert] = useState<EmergencyAlert | null>(null);
 
+  // Real-Time Active Call Session (between both partners' devices)
+  const [activeCall, setActiveCall] = useState<CallSession | null>(null);
+
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
@@ -828,6 +842,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const cloudAlert = (cloudCouple as any).activeEmergencyAlert as EmergencyAlert | null;
           setActiveEmergencyAlert(cloudAlert);
         }
+
+        // Active Call Session synchronization from cloud couple doc
+        if ((cloudCouple as any).activeCall !== undefined) {
+          const cloudCall = (cloudCouple as any).activeCall as CallSession | null;
+          setActiveCall(cloudCall);
+        }
       }
     });
 
@@ -880,6 +900,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (parsed.sharedNotes) setSharedNotes(parsed.sharedNotes);
           if (parsed.surprises) setSurprises(parsed.surprises);
           if (parsed.gameSession !== undefined) setGameSession(parsed.gameSession);
+          if (parsed.activeCall !== undefined) setActiveCall(parsed.activeCall);
         } catch (err) {
           console.debug('Storage sync notice:', err);
         }
@@ -918,6 +939,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         });
       } else if (type === 'EMERGENCY_SOS_TRIGGERED' || type === 'EMERGENCY_SOS_ACKNOWLEDGED' || type === 'EMERGENCY_SOS_CANCELLED') {
         setActiveEmergencyAlert(payload);
+      } else if (type === 'CALL_UPDATE') {
+        setActiveCall(payload);
       }
     };
 
@@ -945,6 +968,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         surprises,
         notifications,
         gameSession,
+        activeCall,
         ...overrides,
       };
 
@@ -2075,6 +2099,192 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     [couple?.id, broadcastChannel, saveAndBroadcast]
   );
 
+  // 17. Real-Time 2-Device Calling (Voice & Video Calls across partner phones)
+  const startCall = useCallback(
+    async (mode: 'voice' | 'video') => {
+      const callId = `call_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+      const newCall: CallSession = {
+        id: callId,
+        coupleId: couple?.id || 'demo_couple',
+        callerId: currentUser.id,
+        callerName: currentUser.name,
+        callerAvatar: currentUser.avatarUrl,
+        callerCity: currentUser.city,
+        recipientId: partnerUser.id,
+        recipientName: partnerUser.name,
+        recipientAvatar: partnerUser.avatarUrl,
+        recipientCity: partnerUser.city,
+        mode,
+        status: 'ringing',
+        startedAt: new Date().toISOString(),
+      };
+
+      setActiveCall(newCall);
+      saveAndBroadcast({ activeCall: newCall });
+
+      if (broadcastChannel) {
+        broadcastChannel.postMessage({
+          type: 'CALL_UPDATE',
+          payload: newCall,
+        });
+      }
+
+      if (couple?.id) {
+        await syncActiveCallToFirestore(couple.id, newCall);
+      }
+    },
+    [couple?.id, currentUser, partnerUser, broadcastChannel, saveAndBroadcast]
+  );
+
+  const acceptIncomingCall = useCallback(async () => {
+    if (!activeCall) return;
+    const updated: CallSession = {
+      ...activeCall,
+      status: 'connected',
+      connectedAt: new Date().toISOString(),
+    };
+
+    setActiveCall(updated);
+    saveAndBroadcast({ activeCall: updated });
+
+    if (broadcastChannel) {
+      broadcastChannel.postMessage({
+        type: 'CALL_UPDATE',
+        payload: updated,
+      });
+    }
+
+    if (couple?.id) {
+      await syncActiveCallToFirestore(couple.id, updated);
+    }
+  }, [activeCall, couple?.id, broadcastChannel, saveAndBroadcast]);
+
+  const declineIncomingCall = useCallback(async () => {
+    if (!activeCall) return;
+    const updated: CallSession = {
+      ...activeCall,
+      status: 'declined',
+      endedAt: new Date().toISOString(),
+      endedBy: currentUser.id,
+    };
+
+    setActiveCall(updated);
+    saveAndBroadcast({ activeCall: updated });
+
+    if (broadcastChannel) {
+      broadcastChannel.postMessage({
+        type: 'CALL_UPDATE',
+        payload: updated,
+      });
+    }
+
+    if (couple?.id) {
+      await syncActiveCallToFirestore(couple.id, updated);
+    }
+
+    // Automatically clear call session after 2 seconds
+    setTimeout(async () => {
+      setActiveCall(null);
+      saveAndBroadcast({ activeCall: null });
+      if (couple?.id) {
+        await syncActiveCallToFirestore(couple.id, null);
+      }
+    }, 2000);
+  }, [activeCall, couple?.id, currentUser.id, broadcastChannel, saveAndBroadcast]);
+
+  const endActiveCall = useCallback(async () => {
+    if (!activeCall) return;
+    const durationSec = activeCall.connectedAt
+      ? Math.max(0, Math.floor((Date.now() - new Date(activeCall.connectedAt).getTime()) / 1000))
+      : 0;
+
+    const updated: CallSession = {
+      ...activeCall,
+      status: 'ended',
+      endedAt: new Date().toISOString(),
+      endedBy: currentUser.id,
+      durationSec,
+    };
+
+    setActiveCall(updated);
+    saveAndBroadcast({ activeCall: updated });
+
+    if (broadcastChannel) {
+      broadcastChannel.postMessage({
+        type: 'CALL_UPDATE',
+        payload: updated,
+      });
+    }
+
+    if (couple?.id) {
+      await syncActiveCallToFirestore(couple.id, updated);
+    }
+
+    // Automatically record sweet call log in chat
+    try {
+      const durationStr =
+        durationSec > 0
+          ? `${Math.floor(durationSec / 60)}m ${durationSec % 60}s`
+          : activeCall.status === 'connected' ? '0m 1s' : 'Missed Call';
+      const callTitle = activeCall.mode === 'video' ? '📹 Video Call' : '📞 Voice Call';
+      await sendMessage(
+        `${callTitle} · ${durationStr}`,
+        undefined,
+        'call',
+        undefined,
+        undefined,
+        {
+          mode: activeCall.mode,
+          durationSec,
+          status: durationSec > 0 ? 'completed' : 'missed',
+        }
+      );
+    } catch (logErr) {
+      console.debug('Call log auto-save notice:', logErr);
+    }
+
+    // Clean up call session from Firestore after 2.5 seconds
+    setTimeout(async () => {
+      setActiveCall(null);
+      saveAndBroadcast({ activeCall: null });
+      if (couple?.id) {
+        await syncActiveCallToFirestore(couple.id, null);
+      }
+    }, 2500);
+  }, [activeCall, couple?.id, currentUser.id, broadcastChannel, saveAndBroadcast, sendMessage]);
+
+  const updateCallSession = useCallback(
+    async (updates: Partial<CallSession>) => {
+      if (!activeCall) return;
+      const updated: CallSession = {
+        ...activeCall,
+        ...updates,
+      };
+      setActiveCall(updated);
+      saveAndBroadcast({ activeCall: updated });
+      if (broadcastChannel) {
+        broadcastChannel.postMessage({
+          type: 'CALL_UPDATE',
+          payload: updated,
+        });
+      }
+      if (couple?.id) {
+        await syncActiveCallToFirestore(couple.id, updated);
+      }
+    },
+    [activeCall, couple?.id, broadcastChannel, saveAndBroadcast]
+  );
+
+  const sendCallReaction = useCallback(
+    async (emoji: string) => {
+      if (!activeCall) return;
+      await updateCallSession({
+        reaction: { emoji, timestamp: Date.now() },
+      });
+    },
+    [activeCall, updateCallSession]
+  );
+
   // Reset to default sample data
   const resetAllDemoData = useCallback(() => {
     setUserA(DEFAULT_USER_A);
@@ -2198,6 +2408,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         triggerEmergencyAlert,
         acknowledgeEmergencyAlert,
         cancelEmergencyAlert,
+        activeCall,
+        startCall,
+        acceptIncomingCall,
+        declineIncomingCall,
+        endActiveCall,
+        updateCallSession,
+        sendCallReaction,
       }}
     >
       {children}

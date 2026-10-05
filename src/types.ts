@@ -66,6 +66,33 @@ export interface Couple {
   partnerBShareLocation?: boolean;
   partnerACity?: string;
   partnerBCity?: string;
+  // Real-time active call session between the couple
+  activeCall?: CallSession | null;
+}
+
+export interface CallSession {
+  id: string;
+  coupleId: string;
+  callerId: string;
+  callerName: string;
+  callerAvatar?: string;
+  callerCity?: string;
+  recipientId: string;
+  recipientName: string;
+  recipientAvatar?: string;
+  recipientCity?: string;
+  mode: 'voice' | 'video';
+  status: 'ringing' | 'connected' | 'declined' | 'ended' | 'missed';
+  startedAt: string;
+  connectedAt?: string;
+  endedAt?: string;
+  endedBy?: string;
+  durationSec?: number;
+  sdpOffer?: string;
+  sdpAnswer?: string;
+  iceCandidatesCaller?: string[];
+  iceCandidatesRecipient?: string[];
+  reaction?: { emoji: string; timestamp: number };
 }
 
 export type QuickLoveType = 'love_you' | 'hug' | 'kiss' | 'miss_you' | 'thinking_of_you';

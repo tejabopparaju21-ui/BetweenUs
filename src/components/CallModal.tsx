@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { UserProfile } from '../types';
+import { useApp } from '../context/AppContext';
 import {
   Phone,
   PhoneOff,
+  PhoneCall,
   Video,
   VideoOff,
   Mic,
@@ -16,27 +17,17 @@ import {
   Sparkles,
   ShieldCheck,
   Wifi,
-  Smile,
   AlertCircle,
 } from 'lucide-react';
 import {
   startCallingRingtone,
+  startIncomingRingtone,
   playCallConnectedSound,
   playCallEndedSound,
   playCallHeartReactionSound,
 } from '../utils/callAudio';
 import { getAudioContext } from '../utils/audioNotes';
 import { formatISTTime } from '../utils/indianCities';
-
-interface CallModalProps {
-  isOpen: boolean;
-  mode: 'voice' | 'video';
-  partnerUser: UserProfile;
-  currentUser: UserProfile;
-  onClose: () => void;
-  onCallEnded?: (summary: { mode: 'voice' | 'video'; durationSec: number }) => void;
-  onSwitchMode?: (newMode: 'voice' | 'video') => void;
-}
 
 interface FloatingHeart {
   id: number;
@@ -45,19 +36,29 @@ interface FloatingHeart {
   size: number;
 }
 
-export const CallModal: React.FC<CallModalProps> = ({
-  isOpen,
-  mode,
-  partnerUser,
-  currentUser,
-  onClose,
-  onCallEnded,
-  onSwitchMode,
-}) => {
-  const [callStatus, setCallStatus] = useState<'ringing' | 'connected' | 'ended'>('ringing');
+const ICE_SERVERS: RTCConfiguration = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
+  ],
+};
+
+export const CallModal: React.FC = () => {
+  const {
+    activeCall,
+    currentUser,
+    partnerUser,
+    acceptIncomingCall,
+    declineIncomingCall,
+    endActiveCall,
+    updateCallSession,
+    sendCallReaction,
+  } = useApp();
+
   const [durationSec, setDurationSec] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
-  const [isVideoOff, setIsVideoOff] = useState(mode === 'voice');
+  const [isVideoOff, setIsVideoOff] = useState(false);
   const [isSpeakerMuted, setIsSpeakerMuted] = useState(false);
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
   const [isMinimized, setIsMinimized] = useState(false);
@@ -65,15 +66,22 @@ export const CallModal: React.FC<CallModalProps> = ({
   const [permissionNotice, setPermissionNotice] = useState<string | null>(null);
   const [floatingHearts, setFloatingHearts] = useState<FloatingHeart[]>([]);
   const [micAudioLevel, setMicAudioLevel] = useState(0.2);
+  const [hasRemoteVideo, setHasRemoteVideo] = useState(false);
 
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
+  const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const ringtoneStopperRef = useRef<(() => void) | null>(null);
-  const timerRef = useRef<number | null>(null);
   const audioMeterRef = useRef<{ animId: number; analyser: AnalyserNode; source: MediaStreamAudioSourceNode } | null>(null);
-  const durationRef = useRef(0);
+  const lastProcessedReactionRef = useRef<number>(0);
+  const offerCreatedRef = useRef<boolean>(false);
+  const answerCreatedRef = useRef<boolean>(false);
 
-  durationRef.current = durationSec;
+  const isCaller = activeCall?.callerId === currentUser.id;
+  const isRecipient = activeCall?.recipientId === currentUser.id;
+  const mode = activeCall?.mode || 'voice';
+  const status = activeCall?.status || 'ended';
 
   // Format seconds into MM:SS
   const formatDuration = (secs: number) => {
@@ -99,53 +107,103 @@ export const CallModal: React.FC<CallModalProps> = ({
       } catch (_) {}
       audioMeterRef.current = null;
     }
+    if (peerConnectionRef.current) {
+      try {
+        peerConnectionRef.current.close();
+      } catch (_) {}
+      peerConnectionRef.current = null;
+    }
     if (localVideoRef.current) {
       localVideoRef.current.srcObject = null;
     }
+    if (remoteVideoRef.current) {
+      remoteVideoRef.current.srcObject = null;
+    }
+    setHasRemoteVideo(false);
+    offerCreatedRef.current = false;
+    answerCreatedRef.current = false;
   }, []);
 
-  // Safe termination
-  const handleEndCall = useCallback(() => {
-    // Stop ringing if still ringing
+  // Stop any active ringtone
+  const stopActiveRingtone = useCallback(() => {
     if (ringtoneStopperRef.current) {
-      ringtoneStopperRef.current();
+      try {
+        ringtoneStopperRef.current();
+      } catch (_) {}
       ringtoneStopperRef.current = null;
     }
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
+  }, []);
+
+  // -------------------------------------------------------------
+  // 1. Ringtone & Audio Handling based on activeCall.status
+  // -------------------------------------------------------------
+  useEffect(() => {
+    if (!activeCall) {
+      stopActiveRingtone();
+      stopMediaStream();
+      return;
     }
 
-    playCallEndedSound();
-    setCallStatus('ended');
-    stopMediaStream();
+    if (activeCall.status === 'ringing') {
+      stopActiveRingtone();
+      if (isRecipient) {
+        // Incoming ringtone on partner's phone
+        ringtoneStopperRef.current = startIncomingRingtone();
+        if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+          try {
+            navigator.vibrate([400, 300, 400, 300, 600]);
+          } catch (_) {}
+        }
+      } else if (isCaller) {
+        // Outgoing soft ring on caller's phone
+        ringtoneStopperRef.current = startCallingRingtone();
+      }
+    } else if (activeCall.status === 'connected') {
+      stopActiveRingtone();
+      playCallConnectedSound();
+    } else if (activeCall.status === 'declined' || activeCall.status === 'ended') {
+      stopActiveRingtone();
+      playCallEndedSound();
+      stopMediaStream();
+    }
 
-    const finalSecs = durationRef.current;
-    setTimeout(() => {
-      onCallEnded?.({ mode, durationSec: finalSecs });
-      onClose();
-    }, 1200);
-  }, [mode, onCallEnded, onClose, stopMediaStream]);
+    return () => {
+      stopActiveRingtone();
+    };
+  }, [activeCall?.status, activeCall?.id, isCaller, isRecipient, stopActiveRingtone, stopMediaStream]);
 
-  // Request media stream on mount / mode change
+  // -------------------------------------------------------------
+  // 2. Synchronized Live Duration Timer
+  // -------------------------------------------------------------
   useEffect(() => {
-    if (!isOpen) return;
+    if (!activeCall || activeCall.status !== 'connected' || !activeCall.connectedAt) {
+      setDurationSec(0);
+      return;
+    }
 
-    setCallStatus('ringing');
-    setDurationSec(0);
-    setIsMinimized(false);
-    setIsMuted(false);
-    setIsVideoOff(mode === 'voice');
-    setPermissionNotice(null);
+    const connectedTime = new Date(activeCall.connectedAt).getTime();
+    const updateElapsed = () => {
+      const now = Date.now();
+      const elapsed = Math.max(0, Math.floor((now - connectedTime) / 1000));
+      setDurationSec(elapsed);
+    };
 
-    // 1. Play calling tone
-    const stopper = startCallingRingtone();
-    ringtoneStopperRef.current = stopper;
+    updateElapsed();
+    const interval = window.setInterval(updateElapsed, 1000);
+    return () => clearInterval(interval);
+  }, [activeCall?.status, activeCall?.connectedAt]);
 
-    // 2. Request user media
+  // -------------------------------------------------------------
+  // 3. Media Stream Acquisition & WebRTC PeerConnection
+  // -------------------------------------------------------------
+  useEffect(() => {
+    if (!activeCall || activeCall.status !== 'connected') {
+      return;
+    }
+
     let isCancelled = false;
 
-    const setupStream = async () => {
+    const setupMediaAndWebRTC = async () => {
       try {
         const constraints: MediaStreamConstraints = {
           audio: true,
@@ -167,12 +225,12 @@ export const CallModal: React.FC<CallModalProps> = ({
 
         localStreamRef.current = stream;
 
-        // Attach to video element if video mode
+        // Attach local preview
         if (localVideoRef.current && mode === 'video') {
           localVideoRef.current.srcObject = stream;
         }
 
-        // Setup live mic analyser for visualizer waves
+        // Setup audio visualizer for mic amplitude
         try {
           const ctx = getAudioContext();
           const analyser = ctx.createAnalyser();
@@ -197,63 +255,158 @@ export const CallModal: React.FC<CallModalProps> = ({
             };
           };
           updateMeter();
-        } catch (_) {
-          // Non-critical visualizer fallback
+        } catch (_) {}
+
+        // Setup WebRTC PeerConnection
+        const pc = new RTCPeerConnection(ICE_SERVERS);
+        peerConnectionRef.current = pc;
+
+        // Add local tracks to WebRTC
+        stream.getTracks().forEach((track) => {
+          pc.addTrack(track, stream);
+        });
+
+        // Handle incoming remote track from partner
+        pc.ontrack = (event) => {
+          if (remoteVideoRef.current && event.streams[0]) {
+            remoteVideoRef.current.srcObject = event.streams[0];
+            setHasRemoteVideo(true);
+          }
+        };
+
+        // Handle local ICE candidates
+        pc.onicecandidate = (event) => {
+          if (event.candidate && activeCall) {
+            const candStr = JSON.stringify(event.candidate);
+            if (isCaller) {
+              const prev = activeCall.iceCandidatesCaller || [];
+              if (!prev.includes(candStr)) {
+                updateCallSession({
+                  iceCandidatesCaller: [...prev, candStr],
+                });
+              }
+            } else {
+              const prev = activeCall.iceCandidatesRecipient || [];
+              if (!prev.includes(candStr)) {
+                updateCallSession({
+                  iceCandidatesRecipient: [...prev, candStr],
+                });
+              }
+            }
+          }
+        };
+
+        // Caller creates initial WebRTC Offer
+        if (isCaller && !offerCreatedRef.current && !activeCall.sdpOffer) {
+          offerCreatedRef.current = true;
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          await updateCallSession({
+            sdpOffer: JSON.stringify(offer),
+          });
         }
       } catch (err: any) {
-        console.warn('Camera/mic access note:', err);
-        if (!isCancelled) {
-          if (mode === 'video') {
-            setPermissionNotice('Camera unavailable or permission denied. Switched to romantic voice/avatar call mode.');
-            setIsVideoOff(true);
-          }
+        console.warn('Media capture warning:', err);
+        if (!isCancelled && mode === 'video') {
+          setPermissionNotice('Camera access unavailable. Continuing in romantic voice/avatar mode.');
+          setIsVideoOff(true);
         }
       }
     };
 
-    setupStream();
-
-    // 3. Simulate partner answering after ~2.8s
-    const connectTimer = window.setTimeout(() => {
-      if (isCancelled) return;
-
-      if (ringtoneStopperRef.current) {
-        ringtoneStopperRef.current();
-        ringtoneStopperRef.current = null;
-      }
-
-      playCallConnectedSound();
-      setCallStatus('connected');
-
-      // Start elapsed timer
-      timerRef.current = window.setInterval(() => {
-        setDurationSec((prev) => prev + 1);
-      }, 1000);
-    }, 2800);
+    setupMediaAndWebRTC();
 
     return () => {
       isCancelled = true;
-      clearTimeout(connectTimer);
-      if (ringtoneStopperRef.current) {
-        ringtoneStopperRef.current();
-        ringtoneStopperRef.current = null;
-      }
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-      stopMediaStream();
     };
-  }, [isOpen, mode, facingMode, stopMediaStream]);
+  }, [activeCall?.id, activeCall?.status, mode, isCaller, facingMode]);
 
-  // Flip Camera for mobile devices
+  // -------------------------------------------------------------
+  // 4. WebRTC Signaling Exchanges (Offer -> Answer -> Remote ICE)
+  // -------------------------------------------------------------
+  useEffect(() => {
+    if (!activeCall || activeCall.status !== 'connected' || !peerConnectionRef.current) {
+      return;
+    }
+
+    const pc = peerConnectionRef.current;
+
+    // Recipient receives Offer and creates Answer
+    if (isRecipient && activeCall.sdpOffer && !answerCreatedRef.current && pc.signalingState === 'stable') {
+      const applyOfferAndAnswer = async () => {
+        try {
+          answerCreatedRef.current = true;
+          const offerDesc = new RTCSessionDescription(JSON.parse(activeCall.sdpOffer!));
+          await pc.setRemoteDescription(offerDesc);
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          await updateCallSession({
+            sdpAnswer: JSON.stringify(answer),
+          });
+        } catch (err) {
+          console.debug('WebRTC recipient answer notice:', err);
+        }
+      };
+      applyOfferAndAnswer();
+    }
+
+    // Caller receives Answer from recipient
+    if (isCaller && activeCall.sdpAnswer && pc.signalingState === 'have-local-offer') {
+      const applyAnswer = async () => {
+        try {
+          const answerDesc = new RTCSessionDescription(JSON.parse(activeCall.sdpAnswer!));
+          await pc.setRemoteDescription(answerDesc);
+        } catch (err) {
+          console.debug('WebRTC caller apply answer notice:', err);
+        }
+      };
+      applyAnswer();
+    }
+
+    // Apply remote ICE candidates
+    const remoteCandidates = isCaller
+      ? activeCall.iceCandidatesRecipient || []
+      : activeCall.iceCandidatesCaller || [];
+
+    if (remoteCandidates.length > 0 && pc.remoteDescription) {
+      remoteCandidates.forEach((candStr) => {
+        try {
+          const candidate = new RTCIceCandidate(JSON.parse(candStr));
+          pc.addIceCandidate(candidate).catch(() => {});
+        } catch (_) {}
+      });
+    }
+  }, [activeCall?.sdpOffer, activeCall?.sdpAnswer, activeCall?.iceCandidatesCaller, activeCall?.iceCandidatesRecipient, isCaller, isRecipient]);
+
+  // -------------------------------------------------------------
+  // 5. Real-Time Floating Love Reactions Sync
+  // -------------------------------------------------------------
+  useEffect(() => {
+    if (!activeCall?.reaction) return;
+    const { emoji, timestamp } = activeCall.reaction;
+    if (timestamp > lastProcessedReactionRef.current) {
+      lastProcessedReactionRef.current = timestamp;
+      playCallHeartReactionSound();
+      const newHeart: FloatingHeart = {
+        id: timestamp + Math.random(),
+        emoji,
+        left: 15 + Math.random() * 70,
+        size: 26 + Math.random() * 22,
+      };
+      setFloatingHearts((prev) => [...prev, newHeart]);
+      setTimeout(() => {
+        setFloatingHearts((prev) => prev.filter((h) => h.id !== newHeart.id));
+      }, 2000);
+    }
+  }, [activeCall?.reaction]);
+
+  // Flip Camera for Mobile
   const handleFlipCamera = async () => {
     if (mode !== 'video') return;
     const nextFacing = facingMode === 'user' ? 'environment' : 'user';
     setFacingMode(nextFacing);
 
     if (localStreamRef.current) {
-      // Stop old video track
       localStreamRef.current.getVideoTracks().forEach((track) => track.stop());
       try {
         const newStream = await navigator.mediaDevices.getUserMedia({
@@ -266,14 +419,20 @@ export const CallModal: React.FC<CallModalProps> = ({
           if (localVideoRef.current) {
             localVideoRef.current.srcObject = localStreamRef.current;
           }
+          if (peerConnectionRef.current) {
+            const sender = peerConnectionRef.current.getSenders().find((s) => s.track?.kind === 'video');
+            if (sender) {
+              sender.replaceTrack(newVideoTrack);
+            }
+          }
         }
       } catch (err) {
-        console.warn('Failed to switch camera:', err);
+        console.warn('Camera flip error:', err);
       }
     }
   };
 
-  // Toggle Mute
+  // Toggle Mute Mic
   const handleToggleMute = () => {
     if (localStreamRef.current) {
       localStreamRef.current.getAudioTracks().forEach((track) => {
@@ -285,12 +444,8 @@ export const CallModal: React.FC<CallModalProps> = ({
     }
   };
 
-  // Toggle Video
+  // Toggle Video Track
   const handleToggleVideo = () => {
-    if (mode === 'voice') {
-      onSwitchMode?.('video');
-      return;
-    }
     if (localStreamRef.current) {
       localStreamRef.current.getVideoTracks().forEach((track) => {
         track.enabled = !track.enabled;
@@ -301,26 +456,111 @@ export const CallModal: React.FC<CallModalProps> = ({
     }
   };
 
-  // Send Floating Love Heart
-  const handleSendHeartReaction = (emoji: string = '❤️') => {
-    playCallHeartReactionSound();
-    const newHeart: FloatingHeart = {
-      id: Date.now() + Math.random(),
-      emoji,
-      left: 15 + Math.random() * 70, // 15% to 85%
-      size: 24 + Math.random() * 20,
-    };
-    setFloatingHearts((prev) => [...prev, newHeart]);
-
-    setTimeout(() => {
-      setFloatingHearts((prev) => prev.filter((h) => h.id !== newHeart.id));
-    }, 2000);
+  // Trigger floating heart
+  const handleSendHeart = (emoji: string = '❤️') => {
+    sendCallReaction(emoji);
   };
 
-  if (!isOpen) return null;
+  if (!activeCall) return null;
+
+  // Partner info display
+  const partnerName = isCaller ? activeCall.recipientName : activeCall.callerName;
+  const partnerAvatar = isCaller ? (activeCall.recipientAvatar || partnerUser.avatarUrl) : (activeCall.callerAvatar || partnerUser.avatarUrl);
+  const partnerCity = isCaller ? (activeCall.recipientCity || partnerUser.city) : (activeCall.callerCity || partnerUser.city);
 
   // -------------------------------------------------------------
-  // Minimized In-App PiP Widget
+  // INCOMING CALL VIEW (Ringing on Recipient Phone)
+  // -------------------------------------------------------------
+  if (status === 'ringing' && isRecipient) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4 animate-in fade-in duration-200">
+        <div className="relative w-full max-w-sm rounded-3xl bg-gradient-to-b from-slate-900 via-rose-950/40 to-black text-white p-6 shadow-2xl border border-rose-500/30 flex flex-col items-center text-center">
+          {/* Concentric romantic aura pulse */}
+          <div className="relative my-6">
+            <div className="absolute -inset-4 rounded-full bg-rose-500/30 animate-ping opacity-75" />
+            <div className="absolute -inset-8 rounded-full bg-pink-500/20 animate-pulse" />
+            <img
+              src={partnerAvatar}
+              alt={partnerName}
+              className="w-28 h-28 rounded-full object-cover border-4 border-rose-400 shadow-2xl relative z-10"
+            />
+            <span className="absolute bottom-1 right-1 w-6 h-6 rounded-full bg-emerald-500 ring-4 ring-slate-950 flex items-center justify-center z-20">
+              <span className="w-2.5 h-2.5 rounded-full bg-white animate-pulse" />
+            </span>
+          </div>
+
+          <span className="px-3 py-1 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-200 text-xs font-semibold mb-2 flex items-center gap-1.5 animate-pulse">
+            {mode === 'video' ? <Video className="w-3.5 h-3.5" /> : <Phone className="w-3.5 h-3.5" />}
+            <span>Incoming {mode === 'video' ? 'Video' : 'Voice'} Call</span>
+          </span>
+
+          <h2 className="text-2xl font-black text-white tracking-wide">{partnerName}</h2>
+          <div className="text-xs text-rose-200/90 mt-1 flex items-center justify-center gap-2 font-medium">
+            <span>📍 {partnerCity || 'Bengaluru'}</span>
+            <span>•</span>
+            <span>{formatISTTime(new Date())} IST</span>
+          </div>
+
+          <p className="text-xs text-slate-300 mt-3 italic">
+            Your love is calling your private couple line... 💖
+          </p>
+
+          {/* Accept / Decline Action Buttons */}
+          <div className="flex items-center justify-around w-full mt-8 gap-6">
+            {/* Decline Button */}
+            <div className="flex flex-col items-center gap-1.5">
+              <button
+                type="button"
+                onClick={declineIncomingCall}
+                className="w-16 h-16 rounded-full bg-gradient-to-tr from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white flex items-center justify-center shadow-xl shadow-red-600/40 transition active:scale-90 cursor-pointer tap-bounce"
+                title="Decline Call"
+              >
+                <PhoneOff className="w-7 h-7" />
+              </button>
+              <span className="text-xs font-bold text-slate-300">Decline</span>
+            </div>
+
+            {/* Accept Button */}
+            <div className="flex flex-col items-center gap-1.5">
+              <button
+                type="button"
+                onClick={acceptIncomingCall}
+                className="w-16 h-16 rounded-full bg-gradient-to-tr from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white flex items-center justify-center shadow-xl shadow-emerald-500/40 transition active:scale-90 cursor-pointer tap-bounce animate-bounce"
+                title="Accept Call"
+              >
+                <PhoneCall className="w-7 h-7" />
+              </button>
+              <span className="text-xs font-bold text-emerald-300">Accept</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // -------------------------------------------------------------
+  // CALL DECLINED OR ENDED OVERLAY
+  // -------------------------------------------------------------
+  if (status === 'declined' || status === 'ended') {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
+        <div className="w-full max-w-xs rounded-3xl bg-slate-900 border border-rose-500/20 text-white p-6 shadow-2xl flex flex-col items-center text-center">
+          <div className="w-16 h-16 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center mb-3">
+            <PhoneOff className="w-8 h-8" />
+          </div>
+          <h3 className="text-lg font-bold text-white">
+            {status === 'declined' ? 'Call Declined' : 'Call Ended'}
+          </h3>
+          <p className="text-xs text-slate-400 mt-1 font-mono">
+            {durationSec > 0 ? `Duration: ${formatDuration(durationSec)}` : `Line closed with ${partnerName}`}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // -------------------------------------------------------------
+  // MINIMIZED IN-APP PIP WIDGET
   // -------------------------------------------------------------
   if (isMinimized) {
     return (
@@ -328,8 +568,8 @@ export const CallModal: React.FC<CallModalProps> = ({
         <div className="bg-slate-900/95 backdrop-blur-xl border border-rose-500/40 text-white rounded-3xl p-3 shadow-2xl flex items-center gap-3 w-72 max-w-[90vw]">
           <div className="relative">
             <img
-              src={partnerUser.avatarUrl}
-              alt={partnerUser.name}
+              src={partnerAvatar}
+              alt={partnerName}
               className="w-12 h-12 rounded-2xl object-cover border-2 border-rose-400"
             />
             <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 ring-2 ring-slate-900 flex items-center justify-center text-[9px]">
@@ -339,26 +579,25 @@ export const CallModal: React.FC<CallModalProps> = ({
 
           <div className="flex-1 min-w-0">
             <div className="text-xs font-bold truncate text-rose-100 flex items-center gap-1">
-              <span>{partnerUser.name}</span>
+              <span>{partnerName}</span>
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
             </div>
             <div className="text-[11px] font-mono text-slate-300">
-              {callStatus === 'ringing' ? 'Calling...' : formatDuration(durationSec)}
+              {status === 'ringing' ? 'Calling...' : formatDuration(durationSec)}
             </div>
           </div>
 
-          {/* Quick controls */}
           <div className="flex items-center gap-1.5">
             <button
               onClick={() => setIsMinimized(false)}
-              className="w-8 h-8 rounded-xl bg-white/15 hover:bg-white/25 flex items-center justify-center text-white transition active:scale-95"
+              className="w-8 h-8 rounded-xl bg-white/15 hover:bg-white/25 flex items-center justify-center text-white transition active:scale-95 cursor-pointer"
               title="Expand call"
             >
               <Maximize2 className="w-4 h-4" />
             </button>
             <button
               onClick={handleToggleMute}
-              className={`w-8 h-8 rounded-xl flex items-center justify-center transition active:scale-95 ${
+              className={`w-8 h-8 rounded-xl flex items-center justify-center transition active:scale-95 cursor-pointer ${
                 isMuted ? 'bg-amber-500/30 text-amber-300 border border-amber-400/40' : 'bg-white/15 text-white'
               }`}
               title={isMuted ? 'Unmute' : 'Mute'}
@@ -366,8 +605,8 @@ export const CallModal: React.FC<CallModalProps> = ({
               {isMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
             </button>
             <button
-              onClick={handleEndCall}
-              className="w-8 h-8 rounded-xl bg-red-600 hover:bg-red-700 text-white flex items-center justify-center transition active:scale-95 shadow-md"
+              onClick={endActiveCall}
+              className="w-8 h-8 rounded-xl bg-red-600 hover:bg-red-700 text-white flex items-center justify-center transition active:scale-95 shadow-md cursor-pointer"
               title="End call"
             >
               <PhoneOff className="w-4 h-4" />
@@ -379,12 +618,12 @@ export const CallModal: React.FC<CallModalProps> = ({
   }
 
   // -------------------------------------------------------------
-  // Full Screen / Modal Experience
+  // FULL SCREEN / MODAL CALL SCREEN (Ringing Outgoing or Connected)
   // -------------------------------------------------------------
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-0 sm:p-4 select-none animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-0 sm:p-4 select-none animate-in fade-in duration-200">
       <div className="relative w-full h-full sm:max-w-md md:max-w-lg sm:h-[88vh] sm:max-h-[780px] bg-gradient-to-b from-slate-900 via-slate-950 to-black text-white sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden border border-rose-500/20">
-        {/* Floating Hearts Container */}
+        {/* Floating Hearts Animation */}
         <div className="absolute inset-0 pointer-events-none z-30 overflow-hidden">
           {floatingHearts.map((heart) => (
             <div
@@ -412,31 +651,28 @@ export const CallModal: React.FC<CallModalProps> = ({
                 <span>{mode === 'video' ? 'Video Call' : 'Voice Call'}</span>
                 <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1 font-mono">
                   <ShieldCheck className="w-3 h-3 text-emerald-400" />
-                  <span>Private</span>
+                  <span>Encrypted 2-Device</span>
                 </span>
               </div>
               <div className="text-[11px] font-mono text-slate-300 flex items-center gap-1.5">
-                {callStatus === 'ringing' ? (
-                  <span className="text-rose-300 font-semibold animate-pulse">Ringing partner...</span>
-                ) : callStatus === 'connected' ? (
+                {status === 'ringing' ? (
+                  <span className="text-rose-300 font-semibold animate-pulse">Calling partner...</span>
+                ) : (
                   <>
                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                     <span className="font-semibold text-emerald-200">{formatDuration(durationSec)}</span>
-                    <span className="text-slate-400">• HD Audio</span>
+                    <span className="text-slate-400">• HD Stream</span>
                   </>
-                ) : (
-                  <span className="text-rose-400 font-bold">Call Ended</span>
                 )}
               </div>
             </div>
           </div>
 
           <div className="flex items-center gap-1.5">
-            {/* Minimize to PiP Button */}
             <button
               onClick={() => setIsMinimized(true)}
               className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-200 hover:text-white transition active:scale-95 cursor-pointer"
-              title="Minimize call to chat"
+              title="Minimize call to app"
             >
               <Minimize2 className="w-4 h-4" />
             </button>
@@ -464,65 +700,74 @@ export const CallModal: React.FC<CallModalProps> = ({
           {/* ========================================================= */}
           {mode === 'video' && (
             <div className="relative w-full h-full flex items-center justify-center">
-              {/* Partner Main Video Feed (Realistic Romantic View) */}
+              {/* Partner Main Video Feed / Stage */}
               <div className="absolute inset-0 overflow-hidden bg-slate-950 flex items-center justify-center">
-                {/* Backdrop ambient glow */}
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/60 to-rose-950/40 z-10" />
-
-                <img
-                  src={partnerUser.avatarUrl}
-                  alt={partnerUser.name}
-                  className="w-full h-full object-cover opacity-60 filter blur-xs scale-105"
+                {/* Real Remote WebRTC Partner Stream */}
+                <video
+                  ref={remoteVideoRef}
+                  autoPlay
+                  playsInline
+                  className={`w-full h-full object-cover ${hasRemoteVideo ? 'block' : 'hidden'}`}
                 />
 
-                {/* Partner Center Avatar / Video Card */}
-                <div className="relative z-10 flex flex-col items-center justify-center text-center p-6 max-w-xs">
-                  <div className="relative mb-4">
-                    {/* Concentric romantic aura pulse */}
-                    {callStatus === 'ringing' && (
-                      <div className="absolute -inset-4 rounded-full bg-rose-500/30 animate-ping opacity-75" />
-                    )}
+                {/* Romantic Avatar Fallback while ringing or if partner camera is off */}
+                {!hasRemoteVideo && (
+                  <>
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/60 to-rose-950/40 z-10" />
                     <img
-                      src={partnerUser.avatarUrl}
-                      alt={partnerUser.name}
-                      className="w-28 h-28 sm:w-32 sm:h-32 rounded-3xl object-cover border-4 border-rose-400/80 shadow-2xl ring-4 ring-rose-500/20"
+                      src={partnerAvatar}
+                      alt={partnerName}
+                      className="w-full h-full object-cover opacity-60 filter blur-xs scale-105"
                     />
-                    <span className="absolute bottom-1 right-1 w-5 h-5 rounded-full bg-emerald-500 ring-4 ring-slate-950 flex items-center justify-center">
-                      <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
-                    </span>
-                  </div>
 
-                  <h3 className="text-xl font-bold text-white tracking-wide flex items-center gap-1.5">
-                    <span>{partnerUser.name}</span>
-                    <Heart className="w-4 h-4 fill-rose-500 text-rose-500" />
-                  </h3>
+                    <div className="relative z-10 flex flex-col items-center justify-center text-center p-6 max-w-xs">
+                      <div className="relative mb-4">
+                        {status === 'ringing' && (
+                          <div className="absolute -inset-4 rounded-full bg-rose-500/30 animate-ping opacity-75" />
+                        )}
+                        <img
+                          src={partnerAvatar}
+                          alt={partnerName}
+                          className="w-28 h-28 sm:w-32 sm:h-32 rounded-3xl object-cover border-4 border-rose-400/80 shadow-2xl ring-4 ring-rose-500/20"
+                        />
+                        <span className="absolute bottom-1 right-1 w-5 h-5 rounded-full bg-emerald-500 ring-4 ring-slate-950 flex items-center justify-center">
+                          <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                        </span>
+                      </div>
 
-                  <div className="text-xs text-rose-200/90 mt-1 flex items-center justify-center gap-2 font-medium">
-                    <span>📍 {partnerUser.city || 'Bengaluru'}</span>
-                    <span>•</span>
-                    <span>{formatISTTime(new Date())} IST</span>
-                  </div>
+                      <h3 className="text-xl font-bold text-white tracking-wide flex items-center gap-1.5">
+                        <span>{partnerName}</span>
+                        <Heart className="w-4 h-4 fill-rose-500 text-rose-500" />
+                      </h3>
 
-                  {callStatus === 'ringing' && (
-                    <div className="mt-3 px-3.5 py-1 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-200 text-xs font-semibold animate-pulse">
-                      Calling your love... 💖
+                      <div className="text-xs text-rose-200/90 mt-1 flex items-center justify-center gap-2 font-medium">
+                        <span>📍 {partnerCity || 'Bengaluru'}</span>
+                        <span>•</span>
+                        <span>{formatISTTime(new Date())} IST</span>
+                      </div>
+
+                      {status === 'ringing' && (
+                        <div className="mt-3 px-3.5 py-1 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-200 text-xs font-semibold animate-pulse">
+                          Calling {partnerName}'s phone... 💖
+                        </div>
+                      )}
+
+                      {status === 'connected' && (
+                        <div className="mt-3 flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs font-medium">
+                          <Wifi className="w-3 h-3 text-emerald-400" />
+                          <span>Live 2-Device Couple Connection</span>
+                        </div>
+                      )}
                     </div>
-                  )}
-
-                  {callStatus === 'connected' && (
-                    <div className="mt-3 flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs font-medium">
-                      <Wifi className="w-3 h-3 text-emerald-400" />
-                      <span>Live Encrypted Couple Stream</span>
-                    </div>
-                  )}
-                </div>
+                  </>
+                )}
               </div>
 
-              {/* Floating Self-View Camera (Corner PiP) */}
+              {/* Local Camera Preview (Corner PiP) */}
               <div
                 onClick={() => setIsSwappedViews(!isSwappedViews)}
                 className="absolute top-4 right-4 z-20 w-28 h-40 sm:w-32 sm:h-44 rounded-2xl overflow-hidden border-2 border-rose-400/60 shadow-2xl bg-slate-900 cursor-pointer group transition-transform active:scale-95"
-                title="Tap to switch camera view"
+                title="Tap to switch view"
               >
                 {!isVideoOff ? (
                   <video
@@ -543,7 +788,6 @@ export const CallModal: React.FC<CallModalProps> = ({
                   </div>
                 )}
 
-                {/* Self View Overlay Badge */}
                 <div className="absolute bottom-1 left-1.5 right-1.5 px-1.5 py-0.5 rounded-md bg-black/60 backdrop-blur-xs text-[9px] font-bold text-white/90 truncate flex items-center justify-between">
                   <span>You</span>
                   {isMuted && <MicOff className="w-2.5 h-2.5 text-amber-400" />}
@@ -557,11 +801,9 @@ export const CallModal: React.FC<CallModalProps> = ({
           {/* ========================================================= */}
           {mode === 'voice' && (
             <div className="relative w-full h-full flex flex-col items-center justify-center p-6 text-center">
-              {/* Romantic background gradient rings */}
               <div className="absolute w-72 h-72 rounded-full bg-rose-500/10 blur-3xl animate-pulse pointer-events-none" />
 
               <div className="relative mb-6">
-                {/* Concentric animated sound rings */}
                 <div
                   style={{ transform: `scale(${1 + micAudioLevel * 0.4})` }}
                   className="absolute -inset-4 rounded-full bg-rose-500/20 transition-transform duration-100 ease-out"
@@ -570,13 +812,13 @@ export const CallModal: React.FC<CallModalProps> = ({
                   style={{ transform: `scale(${1 + micAudioLevel * 0.7})` }}
                   className="absolute -inset-8 rounded-full bg-pink-500/10 transition-transform duration-100 ease-out"
                 />
-                {callStatus === 'ringing' && (
+                {status === 'ringing' && (
                   <div className="absolute -inset-6 rounded-full bg-rose-400/20 animate-ping opacity-60" />
                 )}
 
                 <img
-                  src={partnerUser.avatarUrl}
-                  alt={partnerUser.name}
+                  src={partnerAvatar}
+                  alt={partnerName}
                   className="w-36 h-36 sm:w-40 sm:h-40 rounded-full object-cover border-4 border-rose-400/90 shadow-2xl relative z-10"
                 />
 
@@ -586,20 +828,19 @@ export const CallModal: React.FC<CallModalProps> = ({
               </div>
 
               <h2 className="text-2xl font-bold text-white tracking-wide flex items-center gap-2">
-                <span>{partnerUser.name}</span>
+                <span>{partnerName}</span>
                 <Heart className="w-5 h-5 fill-rose-500 text-rose-500 animate-pulse" />
               </h2>
 
               <div className="text-xs text-rose-200/90 mt-1 flex items-center justify-center gap-2 font-medium">
-                <span>📍 {partnerUser.city || 'Bengaluru'}</span>
+                <span>📍 {partnerCity || 'Bengaluru'}</span>
                 <span>•</span>
                 <span>{formatISTTime(new Date())} IST</span>
               </div>
 
-              {/* Status or Visualizer Waves */}
-              {callStatus === 'ringing' ? (
+              {status === 'ringing' ? (
                 <div className="mt-4 px-4 py-1.5 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-200 text-xs font-semibold animate-pulse">
-                  Calling your love... 📞💖
+                  Calling {partnerName}'s phone... 📞💖
                 </div>
               ) : (
                 <div className="mt-6 flex flex-col items-center gap-2">
@@ -607,7 +848,7 @@ export const CallModal: React.FC<CallModalProps> = ({
                     Connected · {formatDuration(durationSec)}
                   </div>
 
-                  {/* Audio Wave Bars */}
+                  {/* Audio Wave Visualizer */}
                   <div className="flex items-center gap-1.5 h-8 px-4 py-1 bg-black/40 backdrop-blur-md rounded-2xl border border-rose-500/20">
                     {[0.3, 0.6, 1.0, 0.7, 0.9, 0.5, 0.8, 0.4, 0.6, 0.9, 0.3].map((factor, idx) => {
                       const dynamicHeight = Math.max(
@@ -633,14 +874,14 @@ export const CallModal: React.FC<CallModalProps> = ({
           )}
         </div>
 
-        {/* Quick Romantic Emoji Reaction Bar (Tap to send floating hearts) */}
+        {/* Quick Romantic Emoji Reaction Bar (Broadcasts to partner live!) */}
         <div className="relative z-20 px-4 py-2 flex items-center justify-center gap-3 bg-gradient-to-t from-black/80 to-transparent">
           {['❤️', '💖', '😘', '🌹', '✨', '🥰'].map((emoji) => (
             <button
               key={emoji}
-              onClick={() => handleSendHeartReaction(emoji)}
+              onClick={() => handleSendHeart(emoji)}
               className="text-xl sm:text-2xl p-1.5 hover:scale-125 transition-transform active:scale-95 cursor-pointer tap-bounce"
-              title={`Send ${emoji} to ${partnerUser.name}`}
+              title={`Send ${emoji} to ${partnerName}`}
             >
               {emoji}
             </button>
@@ -663,19 +904,21 @@ export const CallModal: React.FC<CallModalProps> = ({
             <span className="text-[9px] mt-0.5 font-medium">{isMuted ? 'Muted' : 'Mic'}</span>
           </button>
 
-          {/* Toggle Video */}
-          <button
-            onClick={handleToggleVideo}
-            className={`w-12 h-12 rounded-2xl flex flex-col items-center justify-center transition active:scale-90 cursor-pointer ${
-              isVideoOff
-                ? 'bg-white/10 text-slate-400'
-                : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
-            }`}
-            title={isVideoOff ? 'Turn video on' : 'Turn video off'}
-          >
-            {isVideoOff ? <VideoOff className="w-5 h-5" /> : <Video className="w-5 h-5" />}
-            <span className="text-[9px] mt-0.5 font-medium">{isVideoOff ? 'Video Off' : 'Video On'}</span>
-          </button>
+          {/* Toggle Video (in video mode) */}
+          {mode === 'video' && (
+            <button
+              onClick={handleToggleVideo}
+              className={`w-12 h-12 rounded-2xl flex flex-col items-center justify-center transition active:scale-90 cursor-pointer ${
+                isVideoOff
+                  ? 'bg-white/10 text-slate-400'
+                  : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+              }`}
+              title={isVideoOff ? 'Turn video on' : 'Turn video off'}
+            >
+              {isVideoOff ? <VideoOff className="w-5 h-5" /> : <Video className="w-5 h-5" />}
+              <span className="text-[9px] mt-0.5 font-medium">{isVideoOff ? 'Video Off' : 'Video On'}</span>
+            </button>
+          )}
 
           {/* Flip Camera (in video mode) or Speaker toggle (in voice mode) */}
           {mode === 'video' ? (
@@ -704,18 +947,18 @@ export const CallModal: React.FC<CallModalProps> = ({
 
           {/* Love Sparkle Reaction Button */}
           <button
-            onClick={() => handleSendHeartReaction('💖')}
+            onClick={() => handleSendHeart('💖')}
             className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-pink-500 to-rose-500 text-white flex flex-col items-center justify-center shadow-lg shadow-rose-500/30 transition active:scale-90 cursor-pointer tap-bounce"
-            title="Send love burst"
+            title="Send love burst to partner"
           >
             <Sparkles className="w-5 h-5" />
             <span className="text-[9px] mt-0.5 font-medium">Love</span>
           </button>
 
-          {/* End Call Button */}
+          {/* End Call / Cancel Button */}
           <button
-            onClick={handleEndCall}
-            className="w-14 h-14 rounded-full bg-gradient-to-tr from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white flex items-center justify-center shadow-xl shadow-red-600/40 transition active:scale-90 cursor-pointer"
+            onClick={endActiveCall}
+            className="w-14 h-14 rounded-full bg-gradient-to-tr from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white flex items-center justify-center shadow-xl shadow-red-600/40 transition active:scale-90 cursor-pointer tap-bounce"
             title="End call"
           >
             <PhoneOff className="w-6 h-6" />
