@@ -58,18 +58,23 @@ export const Navigation: React.FC = () => {
       {/* Top Header Bar - Fixed 56-64px height, clean and uncluttered */}
       <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-rose-100/70 px-3.5 sm:px-6 h-14 sm:h-16 flex items-center transition-all">
         <div className="w-full max-w-5xl mx-auto flex items-center justify-between">
-          {/* Logo & Brand: Pure, Elegant Typographic Wordmark */}
+          {/* Logo & Brand: Pure, Elegant Typographic Wordmark with Dedication */}
           <button
             onClick={() => setActiveTab('home')}
-            className="text-left group flex items-center gap-1.5 focus:outline-none cursor-pointer tap-bounce"
+            className="text-left group flex items-center gap-2 focus:outline-none cursor-pointer tap-bounce shrink-0"
             aria-label="BetweenUs Home"
           >
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-gradient-to-tr from-rose-500 to-pink-500 flex items-center justify-center text-white shadow-sm shadow-rose-200">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-rose-500 to-pink-500 flex items-center justify-center text-white shadow-sm shadow-rose-200 shrink-0">
               <span className="text-xs sm:text-sm">❤️</span>
             </div>
-            <span className="font-black text-lg sm:text-xl tracking-tight text-slate-900 group-hover:text-rose-600 transition-colors">
-              Between<span className="text-rose-600">Us</span>
-            </span>
+            <div className="flex flex-col justify-center min-w-0">
+              <span className="font-black text-base sm:text-lg tracking-tight text-slate-900 group-hover:text-rose-600 transition-colors leading-none">
+                Between<span className="text-rose-600">Us</span>
+              </span>
+              <span className="text-[9px] sm:text-[10px] font-semibold text-rose-500/90 tracking-tight leading-tight mt-0.5 truncate">
+                starts with TEJA and AKHILA
+              </span>
+            </div>
           </button>
 
           {/* Right Header Actions: Essential controls with comfortable 44px touch targets */}

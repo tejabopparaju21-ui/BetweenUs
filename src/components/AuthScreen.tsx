@@ -85,7 +85,10 @@ export const AuthScreen: React.FC = () => {
         <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
           Between<span className="text-rose-600">Us</span>
         </h1>
-        <p className="text-sm font-semibold text-rose-600 mt-1">
+        <p className="text-[11px] sm:text-xs font-bold text-rose-500 tracking-wide mt-1">
+          starts with TEJA and AKHILA
+        </p>
+        <p className="text-xs sm:text-sm font-semibold text-rose-600 mt-1">
           Your Private Long-Distance Haven
         </p>
         <p className="text-xs text-slate-500 mt-2 max-w-xs mx-auto leading-relaxed">
