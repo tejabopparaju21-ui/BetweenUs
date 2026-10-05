@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Heart, Sparkles, Mail, Lock, AlertCircle, ArrowRight, ShieldCheck, MapPin, MessageCircleHeart, ExternalLink } from 'lucide-react';
+import { Heart, Sparkles, Mail, Lock, AlertCircle, ArrowRight, ShieldCheck, MapPin, MessageCircleHeart, ExternalLink, Copy, Check } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import firebaseConfig from '../../firebase-applet-config.json';
 
@@ -12,6 +12,17 @@ export const AuthScreen: React.FC = () => {
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [copiedDomain, setCopiedDomain] = useState(false);
+
+  const currentHost = typeof window !== 'undefined' ? window.location.hostname : 'between-us-seven-kappa.vercel.app';
+
+  const handleCopyDomain = () => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(currentHost);
+      setCopiedDomain(true);
+      setTimeout(() => setCopiedDomain(false), 2500);
+    }
+  };
 
   const handleGoogleLogin = async () => {
     setError(null);
@@ -105,14 +116,49 @@ export const AuthScreen: React.FC = () => {
       <div className="w-full max-w-md mx-auto my-6 bg-white/90 backdrop-blur-md rounded-3xl p-6 sm:p-7 border border-rose-100 shadow-xl shadow-rose-100/50">
         {error && (
           error.includes('unauthorized-domain') ? (
-            <div className="mb-5 p-4 rounded-2xl bg-amber-50/90 border border-amber-200 text-amber-950 text-xs space-y-2.5 animate-in fade-in shadow-xs">
+            <div className="mb-5 p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-950 text-xs space-y-3 animate-in fade-in shadow-xs">
               <div className="flex items-center gap-2 font-bold text-amber-900">
                 <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
                 <span>Domain Not Authorized in Firebase</span>
               </div>
               <p className="text-[11px] text-amber-800 leading-relaxed">
-                Google Sign-In requires <code className="bg-amber-100/80 px-1.5 py-0.5 rounded font-mono font-bold text-amber-900">localhost</code> to be added to Authorized Domains in your Firebase Authentication Settings.
+                Google Sign-In is blocked until this domain is added to <strong>Authorized Domains</strong> in your Firebase Console:
               </p>
+              
+              {/* Domain chip with 1-click copy */}
+              <div className="flex items-center justify-between gap-2 p-2 bg-amber-100/90 border border-amber-300/80 rounded-xl">
+                <code className="text-[11px] font-mono font-bold text-amber-950 truncate px-1">
+                  {currentHost}
+                </code>
+                <button
+                  type="button"
+                  onClick={handleCopyDomain}
+                  className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-700 hover:bg-amber-800 text-white font-bold text-[10px] shadow-2xs transition active:scale-95 cursor-pointer"
+                >
+                  {copiedDomain ? (
+                    <>
+                      <Check className="w-3 h-3 text-emerald-300" />
+                      <span>Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3 h-3" />
+                      <span>Copy Domain</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* 30-second fix steps */}
+              <div className="text-[10px] text-amber-900/90 space-y-1 bg-white/70 p-2.5 rounded-xl border border-amber-200">
+                <p className="font-bold text-amber-950">How to authorize in 30 seconds:</p>
+                <ol className="list-decimal list-inside space-y-0.5 text-amber-900">
+                  <li>Click <strong>Copy Domain</strong> above.</li>
+                  <li>Open <strong>Firebase Console Settings</strong> below.</li>
+                  <li>Scroll to <strong>Authorized domains</strong> → <strong>Add domain</strong> → Paste & Save.</li>
+                </ol>
+              </div>
+
               <div className="flex flex-col gap-2 pt-1">
                 <a
                   href={`https://console.firebase.google.com/project/${firebaseConfig.projectId}/authentication/settings`}
@@ -120,17 +166,30 @@ export const AuthScreen: React.FC = () => {
                   rel="noopener noreferrer"
                   className="w-full inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-xs transition"
                 >
-                  <span>Add localhost in Firebase Console</span>
+                  <span>Open Firebase Settings</span>
                   <ExternalLink className="w-3.5 h-3.5" />
                 </a>
-                <button
-                  type="button"
-                  onClick={enterDemoMode}
-                  className="w-full inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 font-bold text-xs transition cursor-pointer"
-                >
-                  <span>Explore App in Demo Mode Now</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEmailMode(true);
+                      setError(null);
+                    }}
+                    className="inline-flex items-center justify-center gap-1 py-2 px-2 rounded-xl bg-white hover:bg-rose-50 text-rose-700 border border-rose-200 font-bold text-[11px] transition cursor-pointer"
+                  >
+                    <span>Use Email Sign-In</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={enterDemoMode}
+                    className="inline-flex items-center justify-center gap-1 py-2 px-2 rounded-xl bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 font-bold text-[11px] transition cursor-pointer"
+                  >
+                    <span>Try Demo Mode</span>
+                    <ArrowRight className="w-3 h-3" />
+                  </button>
+                </div>
               </div>
             </div>
           ) : (
