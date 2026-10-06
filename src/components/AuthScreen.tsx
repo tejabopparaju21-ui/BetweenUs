@@ -15,12 +15,24 @@ export const AuthScreen: React.FC = () => {
   const [copiedDomain, setCopiedDomain] = useState(false);
 
   const currentHost = typeof window !== 'undefined' ? window.location.hostname : 'between-us-seven-kappa.vercel.app';
+  const prodHost = 'between-us-seven-kappa.vercel.app';
 
-  const handleCopyDomain = () => {
+  const [copiedProd, setCopiedProd] = useState(false);
+  const [copiedCurrent, setCopiedCurrent] = useState(false);
+
+  const handleCopyProd = () => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(prodHost);
+      setCopiedProd(true);
+      setTimeout(() => setCopiedProd(false), 2500);
+    }
+  };
+
+  const handleCopyCurrent = () => {
     if (typeof navigator !== 'undefined' && navigator.clipboard) {
       navigator.clipboard.writeText(currentHost);
-      setCopiedDomain(true);
-      setTimeout(() => setCopiedDomain(false), 2500);
+      setCopiedCurrent(true);
+      setTimeout(() => setCopiedCurrent(false), 2500);
     }
   };
 
@@ -69,6 +81,13 @@ export const AuthScreen: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const fillQuickTestCredentials = () => {
+    setEmail('teja@betweenus.love');
+    setPassword('betweenus2026');
+    setName('Teja');
+    setIsEmailMode(true);
   };
 
   return (
@@ -132,8 +151,8 @@ export const AuthScreen: React.FC = () => {
         )}
         {error && (
           error.includes('unauthorized-domain') ? (
-            <div className="mb-5 p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-950 text-xs space-y-3 animate-in fade-in shadow-xs">
-              <div className="flex items-center gap-2 font-bold text-amber-900">
+            <div className="mb-5 p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-950 text-xs space-y-3.5 animate-in fade-in shadow-xs">
+              <div className="flex items-center gap-2 font-bold text-amber-900 text-sm">
                 <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
                 <span>Domain Not Authorized in Firebase</span>
               </div>
@@ -141,36 +160,65 @@ export const AuthScreen: React.FC = () => {
                 Google Sign-In is blocked until this domain is added to <strong>Authorized Domains</strong> in your Firebase Console:
               </p>
               
-              {/* Domain chip with 1-click copy */}
-              <div className="flex items-center justify-between gap-2 p-2 bg-amber-100/90 border border-amber-300/80 rounded-xl">
-                <code className="text-[11px] font-mono font-bold text-amber-950 truncate px-1">
-                  {currentHost}
-                </code>
-                <button
-                  type="button"
-                  onClick={handleCopyDomain}
-                  className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-700 hover:bg-amber-800 text-white font-bold text-[10px] shadow-2xs transition active:scale-95 cursor-pointer"
-                >
-                  {copiedDomain ? (
-                    <>
-                      <Check className="w-3 h-3 text-emerald-300" />
-                      <span>Copied!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3 h-3" />
-                      <span>Copy Domain</span>
-                    </>
+              {/* Production Domain chip with 1-click copy */}
+              <div className="p-2.5 bg-amber-100/90 border border-amber-300/80 rounded-xl space-y-1.5">
+                <div className="flex items-center justify-between text-[10px] font-semibold text-amber-900">
+                  <span>Production Domain (Recommended):</span>
+                  {currentHost === prodHost && (
+                    <span className="text-[9px] bg-amber-200/90 text-amber-900 font-bold px-1.5 py-0.5 rounded">Active</span>
                   )}
-                </button>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <code className="text-[11px] font-mono font-bold text-amber-950 break-all select-all">
+                    {prodHost}
+                  </code>
+                  <button
+                    type="button"
+                    onClick={handleCopyProd}
+                    className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-700 hover:bg-amber-800 text-white font-bold text-[10px] shadow-2xs transition active:scale-95 cursor-pointer"
+                  >
+                    {copiedProd ? (
+                      <>
+                        <Check className="w-3 h-3 text-emerald-300" />
+                        <span>Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3 h-3" />
+                        <span>Copy Domain</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
+
+              {/* Current preview host chip if different */}
+              {currentHost !== prodHost && (
+                <div className="p-2 bg-white/80 border border-amber-200 rounded-xl space-y-1">
+                  <div className="flex items-center justify-between text-[9px] text-amber-900 font-medium">
+                    <span>Current Deployment URL:</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <code className="text-[10px] font-mono text-slate-700 break-all select-all">
+                      {currentHost}
+                    </code>
+                    <button
+                      type="button"
+                      onClick={handleCopyCurrent}
+                      className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[9px] transition cursor-pointer"
+                    >
+                      {copiedCurrent ? 'Copied!' : 'Copy'}
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* 30-second fix steps */}
               <div className="text-[10px] text-amber-900/90 space-y-1 bg-white/70 p-2.5 rounded-xl border border-amber-200">
                 <p className="font-bold text-amber-950">How to authorize in 30 seconds:</p>
                 <ol className="list-decimal list-inside space-y-0.5 text-amber-900">
                   <li>Click <strong>Copy Domain</strong> above.</li>
-                  <li>Open <strong>Firebase Console Settings</strong> below.</li>
+                  <li>Click <strong>Open Firebase Settings</strong> below.</li>
                   <li>Scroll to <strong>Authorized domains</strong> → <strong>Add domain</strong> → Paste & Save.</li>
                 </ol>
               </div>
@@ -180,31 +228,38 @@ export const AuthScreen: React.FC = () => {
                   href={`https://console.firebase.google.com/project/${firebaseConfig.projectId}/authentication/settings`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-full inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-xs transition"
+                  className="w-full inline-flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-xs transition"
                 >
                   <span>Open Firebase Settings</span>
                   <ExternalLink className="w-3.5 h-3.5" />
                 </a>
 
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsEmailMode(true);
-                      setError(null);
-                    }}
-                    className="inline-flex items-center justify-center gap-1 py-2 px-2 rounded-xl bg-white hover:bg-rose-50 text-rose-700 border border-rose-200 font-bold text-[11px] transition cursor-pointer"
-                  >
-                    <span>Use Email Sign-In</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={enterDemoMode}
-                    className="inline-flex items-center justify-center gap-1 py-2 px-2 rounded-xl bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 font-bold text-[11px] transition cursor-pointer"
-                  >
-                    <span>Try Demo Mode</span>
-                    <ArrowRight className="w-3 h-3" />
-                  </button>
+                {/* Instant Bypass Options */}
+                <div className="pt-2 border-t border-amber-200/80">
+                  <p className="text-[10px] font-bold text-amber-950 mb-1.5 text-center">
+                    Or sign in immediately without waiting:
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsEmailMode(true);
+                        setError(null);
+                      }}
+                      className="inline-flex items-center justify-center gap-1 py-2 px-2 rounded-xl bg-white hover:bg-rose-50 text-rose-700 border border-rose-300 font-bold text-[11px] shadow-2xs transition cursor-pointer"
+                    >
+                      <Mail className="w-3 h-3" />
+                      <span>Use Email Sign-In</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={enterDemoMode}
+                      className="inline-flex items-center justify-center gap-1 py-2 px-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-[11px] shadow-2xs transition cursor-pointer"
+                    >
+                      <Sparkles className="w-3 h-3" />
+                      <span>1-Click Demo Mode</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -252,15 +307,25 @@ export const AuthScreen: React.FC = () => {
           </span>
         </div>
 
-        {/* Toggle Email Mode */}
+        {/* Toggle Email Mode & Quick Access */}
         {!isEmailMode ? (
-          <button
-            type="button"
-            onClick={() => setIsEmailMode(true)}
-            className="w-full py-2.5 px-3 rounded-2xl border border-slate-200 text-xs font-semibold text-slate-600 hover:text-rose-600 hover:bg-rose-50/50 hover:border-rose-200 transition text-center cursor-pointer"
-          >
-            Sign in with email and password
-          </button>
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={() => setIsEmailMode(true)}
+              className="w-full py-2.5 px-3 rounded-2xl border border-slate-200 text-xs font-semibold text-slate-600 hover:text-rose-600 hover:bg-rose-50/50 hover:border-rose-200 transition text-center cursor-pointer"
+            >
+              Sign in with email and password
+            </button>
+            <button
+              type="button"
+              onClick={enterDemoMode}
+              className="w-full py-2.5 px-3 rounded-2xl bg-gradient-to-r from-rose-50 to-pink-50 hover:from-rose-100 hover:to-pink-100 border border-rose-200 text-xs font-bold text-rose-700 transition flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-rose-500" />
+              <span>Instant Demo Sanctuary (Teja & Akhila)</span>
+            </button>
+          </div>
         ) : (
           <form onSubmit={handleEmailAuth} className="space-y-3">
             {isRegister && (
@@ -328,6 +393,14 @@ export const AuthScreen: React.FC = () => {
                 Hide
               </button>
             </div>
+
+            <button
+              type="button"
+              onClick={fillQuickTestCredentials}
+              className="w-full py-1.5 px-2 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 text-[10px] font-semibold transition text-center cursor-pointer"
+            >
+              Quick Test: Fill Sample Account (teja@betweenus.love)
+            </button>
           </form>
         )}
       </div>

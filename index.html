@@ -3,6 +3,16 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <script>
+      (function() {
+        try {
+          var h = window.location.hostname;
+          if (h && h.endsWith('.vercel.app') && h !== 'between-us-seven-kappa.vercel.app') {
+            window.location.replace('https://between-us-seven-kappa.vercel.app' + window.location.pathname + window.location.search + window.location.hash);
+          }
+        } catch(e) {}
+      })();
+    </script>
     <title>BetweenUs - Long-Distance Relationship Companion</title>
     <meta name="description" content="A private, warm, and secure digital sanctuary for long-distance couples to chat, share moods, track distance, plan virtual dates, and cherish memories together." />
     
