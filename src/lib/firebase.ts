@@ -22,17 +22,8 @@ try {
     : getFirestore(app);
 }
 
-// Validate Connection to Firestore per Firebase Skill
-async function testConnection() {
-  try {
-    await getDocFromServer(doc(firestoreDb, 'test', 'connection'));
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.error('Please check your Firebase configuration.');
-    }
-  }
-}
-testConnection();
+// Firestore is initialized with offline persistence and named database support per project configuration
+
 
 /**
  * Validates candidate Realtime Database URLs.

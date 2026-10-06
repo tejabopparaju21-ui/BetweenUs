@@ -65,6 +65,18 @@ export const ConnectSection: React.FC = () => {
   const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
   const [synthStopFn, setSynthStopFn] = useState<(() => void) | null>(null);
 
+  // Stop playing audio/synthesizer when navigating away or unmounting
+  React.useEffect(() => {
+    return () => {
+      if (audioElement) {
+        audioElement.pause();
+      }
+      if (synthStopFn) {
+        synthStopFn();
+      }
+    };
+  }, [audioElement, synthStopFn]);
+
   const togglePlaySong = (song: any) => {
     if (synthStopFn) {
       synthStopFn();

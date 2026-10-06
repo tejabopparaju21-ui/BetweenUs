@@ -49,6 +49,7 @@ export const SettingsSection: React.FC = () => {
     updateUserProfile,
     updateCouple,
     stopSharingEverything,
+    requestLocationPermission,
     addEmergencyContact,
     deleteEmergencyContact,
     connectCoupleWithCode,
@@ -89,10 +90,6 @@ export const SettingsSection: React.FC = () => {
     }));
   };
 
-  // Database Tables Explorer States
-  const [selectedTable, setSelectedTable] = useState<'messages' | 'moods' | 'memories' | 'couples' | 'users'>('messages');
-  const [tableSearch, setTableSearch] = useState('');
-  const [inspectDocId, setInspectDocId] = useState<string | null>(null);
 
   // Firebase Auth Form States
   const [authEmail, setAuthEmail] = useState('');
@@ -169,6 +166,8 @@ export const SettingsSection: React.FC = () => {
     setTimeout(() => setProfileSuccessMsg(null), 3000);
   };
 
+  const [copiedLink, setCopiedLink] = useState(false);
+
   const handleCopyCode = () => {
     const codeToCopy = currentUser.coupleCode || couple?.code;
     if (codeToCopy) {
@@ -178,17 +177,25 @@ export const SettingsSection: React.FC = () => {
     }
   };
 
+  const handleCopyInviteLink = () => {
+    const code = currentUser.coupleCode || couple?.code || 'PAIR-LOVE';
+    const inviteUrl = `${window.location.origin}/?code=${encodeURIComponent(code)}`;
+    navigator.clipboard.writeText(inviteUrl);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2000);
+  };
+
   const handleShareWhatsApp = () => {
     const code = currentUser.coupleCode || couple?.code || 'PAIR-LOVE';
-    const appUrl = window.location.origin;
-    const message = `Hey! ❤️ Connect with me on BetweenUs — our private couples space for live chat, mood sharing, and distance tracking.\n\nOur private couple code: ${code}\n\nOpen app: ${appUrl}`;
+    const inviteUrl = `${window.location.origin}/?code=${encodeURIComponent(code)}`;
+    const message = `Hey! ❤️ Connect with me on BetweenUs — our private couples space for live chat, mood sharing, and distance tracking.\n\nOur private couple code: ${code}\n\nTap here to connect directly: ${inviteUrl}`;
     const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`;
 
     if (typeof navigator !== 'undefined' && navigator.share) {
       navigator.share({
         title: 'BetweenUs Couple Invitation',
         text: message,
-        url: appUrl,
+        url: inviteUrl,
       }).catch(() => {
         const opened = window.open(whatsappUrl, '_blank');
         if (!opened) window.location.href = whatsappUrl;
@@ -717,7 +724,7 @@ export const SettingsSection: React.FC = () => {
               <button
                 type="button"
                 onClick={async () => {
-                  await (useApp as any)().requestLocationPermission?.('current');
+                  await requestLocationPermission('current');
                   setProfileSuccessMsg('Acquired live GPS coordinates!');
                   setTimeout(() => setProfileSuccessMsg(null), 3000);
                 }}
@@ -1043,15 +1050,6 @@ export const SettingsSection: React.FC = () => {
                   <RefreshCw className={`w-3.5 h-3.5 ${isCloudSyncing ? 'animate-spin' : ''}`} />
                   <span>{isCloudSyncing ? 'Syncing...' : 'Sync Now'}</span>
                 </button>
-                <a
-                  href={`https://console.firebase.google.com/project/${firebaseProjectId || 'civic-citizen-3t8c4'}/firestore/databases/ai-studio-betweenuslongdis-19fa57bd-7a36-4ffc-96b1-ecd345098455/data`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="py-2 px-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-xs flex items-center justify-center gap-1.5 transition border border-white/20"
-                >
-                  <ExternalLink className="w-3.5 h-3.5 text-amber-300" />
-                  <span>Console</span>
-                </a>
               </div>
 
               {authFeedback && (
@@ -1061,169 +1059,64 @@ export const SettingsSection: React.FC = () => {
               )}
             </div>
 
-            {/* Table Selector Tabs */}
-            <div className="space-y-2">
-              <span className="text-xs font-bold text-slate-800 block">In-App Live Firestore Tables</span>
-              <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-2xl overflow-x-auto no-scrollbar text-xs">
-                {[
-                  { key: 'messages', label: 'messages', count: messages.length, icon: '💬' },
-                  { key: 'moods', label: 'moods', count: moods.length, icon: '❤️' },
-                  { key: 'memories', label: 'memories', count: memories.length, icon: '📸' },
-                  { key: 'couples', label: 'couples', count: couple ? 1 : 0, icon: '👥' },
-                  { key: 'users', label: 'users', count: 2, icon: '👤' },
-                ].map((t) => (
-                  <button
-                    key={t.key}
-                    type="button"
-                    onClick={() => {
-                      setSelectedTable(t.key as any);
-                      setInspectDocId(null);
-                    }}
-                    className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl font-medium whitespace-nowrap transition cursor-pointer ${
-                      selectedTable === t.key
-                        ? 'bg-white text-rose-600 shadow-2xs font-bold'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    <span>{t.icon}</span>
-                    <span className="font-mono text-[11px]">{t.label}</span>
-                    <span className="text-[10px] px-1 py-0.2 rounded-full bg-slate-200 text-slate-700">
-                      {t.count}
-                    </span>
-                  </button>
-                ))}
-              </div>
-
-              {/* Table search */}
-              <div className="relative">
-                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  placeholder={`Search ${selectedTable}...`}
-                  value={tableSearch}
-                  onChange={(e) => setTableSearch(e.target.value)}
-                  className="w-full text-xs pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-400"
-                />
-              </div>
-
-              {/* Table Rows Preview */}
-              <div className="overflow-x-auto rounded-2xl border border-slate-200 max-h-48">
-                {selectedTable === 'messages' && (
-                  <table className="w-full text-left border-collapse text-[11px]">
-                    <tbody className="divide-y divide-slate-100 font-mono">
-                      {messages.slice(0, 10).map((m) => (
-                        <tr key={m.id} className="hover:bg-rose-50/30">
-                          <td className="py-2 px-3 text-slate-800 font-bold">{m.senderName}</td>
-                          <td className="py-2 px-3 text-slate-600 truncate max-w-[120px]">{m.text}</td>
-                          <td className="py-2 px-3 text-right">
-                            <button
-                              type="button"
-                              onClick={() => setInspectDocId(m.id)}
-                              className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-[10px]"
-                            >
-                              JSON
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-                {selectedTable === 'moods' && (
-                  <table className="w-full text-left border-collapse text-[11px]">
-                    <tbody className="divide-y divide-slate-100 font-mono">
-                      {moods.map((mood) => (
-                        <tr key={mood.id} className="hover:bg-rose-50/30">
-                          <td className="py-2 px-3 text-slate-800 font-bold">{mood.userName}</td>
-                          <td className="py-2 px-3 text-rose-600 capitalize">{mood.moodType.replace('_', ' ')}</td>
-                          <td className="py-2 px-3 text-right">
-                            <button
-                              type="button"
-                              onClick={() => setInspectDocId(mood.id)}
-                              className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-[10px]"
-                            >
-                              JSON
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-                {selectedTable === 'memories' && (
-                  <table className="w-full text-left border-collapse text-[11px]">
-                    <tbody className="divide-y divide-slate-100 font-mono">
-                      {memories.map((mem) => (
-                        <tr key={mem.id} className="hover:bg-rose-50/30">
-                          <td className="py-2 px-3 text-slate-800 font-bold">{mem.title}</td>
-                          <td className="py-2 px-3 text-slate-500">{mem.date}</td>
-                          <td className="py-2 px-3 text-right">
-                            <button
-                              type="button"
-                              onClick={() => setInspectDocId(mem.id)}
-                              className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-[10px]"
-                            >
-                              JSON
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-                {selectedTable === 'couples' && couple && (
-                  <div className="p-3 text-xs font-mono space-y-1">
-                    <div>Code: <strong className="text-rose-600">{couple.code}</strong></div>
-                    <div>Name: {couple.relationshipName}</div>
-                    <div>Anniversary: {couple.anniversaryDate}</div>
+            {/* Cloud Sync & Couple Security Card */}
+            <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-xs space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center text-sm font-bold">
+                    🛡️
                   </div>
-                )}
-                {selectedTable === 'users' && (
-                  <div className="p-3 text-xs font-mono space-y-1">
-                    <div>User A: {currentUser.name} ({currentUser.city})</div>
-                    <div>User B: {partnerUser.name} ({partnerUser.city})</div>
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-800">Couple Privacy & Security</h4>
+                    <p className="text-[10px] text-slate-500">End-to-end isolated space for two partners</p>
                   </div>
-                )}
-              </div>
-
-              {/* JSON Drawer */}
-              {inspectDocId && (
-                <div className="bg-slate-900 text-white p-3 rounded-2xl space-y-1.5 text-xs">
-                  <div className="flex justify-between items-center text-slate-400">
-                    <span className="font-mono text-[10px]">Doc: {inspectDocId}</span>
-                    <button type="button" onClick={() => setInspectDocId(null)} className="text-xs hover:text-white">
-                      Close
-                    </button>
-                  </div>
-                  <pre className="text-[10px] font-mono text-emerald-400 overflow-x-auto max-h-36 p-2 bg-black/40 rounded-xl">
-                    {JSON.stringify(
-                      selectedTable === 'messages'
-                        ? messages.find((m) => m.id === inspectDocId)
-                        : selectedTable === 'moods'
-                        ? moods.find((m) => m.id === inspectDocId)
-                        : memories.find((m) => m.id === inspectDocId),
-                      null,
-                      2
-                    )}
-                  </pre>
                 </div>
-              )}
+                <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
+                  Active
+                </span>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 pt-1 border-t border-slate-100 text-center">
+                <div className="p-2 rounded-xl bg-slate-50">
+                  <div className="text-[10px] text-slate-500 font-medium">Messages</div>
+                  <div className="text-sm font-black text-slate-800 font-mono">{messages.length}</div>
+                </div>
+                <div className="p-2 rounded-xl bg-slate-50">
+                  <div className="text-[10px] text-slate-500 font-medium">Moods</div>
+                  <div className="text-sm font-black text-slate-800 font-mono">{moods.length}</div>
+                </div>
+                <div className="p-2 rounded-xl bg-slate-50">
+                  <div className="text-[10px] text-slate-500 font-medium">Memories</div>
+                  <div className="text-sm font-black text-slate-800 font-mono">{memories.length}</div>
+                </div>
+              </div>
+
+              <p className="text-[11px] text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-200/60 leading-relaxed">
+                🔒 All messages, moods, and live coordinates are synchronized exclusively between you and your partner. Access is cryptographically restricted by backend security rules.
+              </p>
             </div>
 
             {/* Direct Partner Pairing & Enter Code Section */}
             <div className="p-4 rounded-2xl bg-gradient-to-br from-rose-50 to-pink-50 border border-rose-200/80 space-y-3">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div>
                   <span className="text-xs font-bold text-slate-800 block">💑 Couple Code & Partner Link</span>
                   <span className="text-[11px] text-slate-500 font-mono">Your Code: <strong className="text-rose-600">{couple?.code || currentUser.coupleCode || 'PAIR-CODE'}</strong></span>
                 </div>
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={handleCopyInviteLink}
+                    className="px-2.5 py-1 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded-lg text-xs font-bold transition active:scale-95 cursor-pointer"
+                  >
+                    {copiedLink ? 'Link Copied!' : 'Copy Link'}
+                  </button>
                   <button
                     type="button"
                     onClick={handleCopyCode}
                     className="px-2.5 py-1 bg-white hover:bg-rose-50 border border-rose-200 text-rose-600 rounded-lg text-xs font-bold transition active:scale-95 cursor-pointer"
                   >
-                    {copiedCode ? 'Copied!' : 'Copy'}
+                    {copiedCode ? 'Code Copied!' : 'Copy Code'}
                   </button>
                   <button
                     type="button"

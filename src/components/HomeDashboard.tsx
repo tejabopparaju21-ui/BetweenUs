@@ -71,6 +71,8 @@ export const HomeDashboard: React.FC = () => {
   const [linkCodeSuccess, setLinkCodeSuccess] = useState(false);
   const [manualShowPairing, setManualShowPairing] = useState(false);
 
+  const [copiedInviteLink, setCopiedInviteLink] = useState(false);
+
   const handleCopyCode = async () => {
     const code = couple?.code || currentUser.coupleCode || 'PAIR-CODE';
     try {
@@ -80,12 +82,33 @@ export const HomeDashboard: React.FC = () => {
     } catch (e) {}
   };
 
+  const handleCopyInviteLink = async () => {
+    const code = couple?.code || currentUser.coupleCode || 'PAIR-CODE';
+    const inviteUrl = `${window.location.origin}/?code=${encodeURIComponent(code)}`;
+    try {
+      await navigator.clipboard.writeText(inviteUrl);
+      setCopiedInviteLink(true);
+      setTimeout(() => setCopiedInviteLink(false), 2500);
+    } catch (e) {}
+  };
+
   const handleShareWhatsApp = () => {
     const code = couple?.code || currentUser.coupleCode || 'PAIR-CODE';
-    const appUrl = window.location.origin;
-    const message = `Hey my love! ❤️ Join me on BetweenUs so we can chat and track our space.\n\nOur private couple code: ${code}\n\nOpen BetweenUs here: ${appUrl}`;
+    const inviteUrl = `${window.location.origin}/?code=${encodeURIComponent(code)}`;
+    const message = `Hey my love! ❤️ Join me on BetweenUs so we can chat and track our space.\n\nOur private couple code: ${code}\n\nTap here to connect directly: ${inviteUrl}`;
     const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`;
-    window.open(whatsappUrl, '_blank');
+
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      navigator.share({
+        title: 'BetweenUs Couple Invitation',
+        text: message,
+        url: inviteUrl,
+      }).catch(() => {
+        window.open(whatsappUrl, '_blank');
+      });
+    } else {
+      window.open(whatsappUrl, '_blank');
+    }
   };
 
   const handleDirectLinkCode = async (e: React.FormEvent) => {

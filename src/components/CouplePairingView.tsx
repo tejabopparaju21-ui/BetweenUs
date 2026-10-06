@@ -14,7 +14,10 @@ export const CouplePairingView: React.FC<CouplePairingViewProps> = ({ onClose })
   const [linkError, setLinkError] = useState<string | null>(null);
   const [linkSuccess, setLinkSuccess] = useState<string | null>(null);
 
+  const [copiedLink, setCopiedLink] = useState(false);
+
   const myCode = currentUser.coupleCode || couple?.code || 'PAIR-LOVE';
+  const inviteUrl = typeof window !== 'undefined' ? `${window.location.origin}/?code=${encodeURIComponent(myCode)}` : '';
 
   const handleCopyCode = async () => {
     try {
@@ -26,16 +29,25 @@ export const CouplePairingView: React.FC<CouplePairingViewProps> = ({ onClose })
     }
   };
 
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(inviteUrl);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2500);
+    } catch (err) {
+      console.warn('Copy link failed:', err);
+    }
+  };
+
   const handleShareWhatsApp = () => {
-    const appUrl = window.location.origin;
-    const message = `Hey my love! ❤️ Join me on BetweenUs so we can chat, share moods, and track distance in our private space.\n\nUse our private couple code: ${myCode}\n\nOpen BetweenUs here: ${appUrl}`;
+    const message = `Hey my love! ❤️ Join me on BetweenUs so we can chat, share moods, and track distance in our private space.\n\nUse our private couple code: ${myCode}\n\nTap here to connect directly: ${inviteUrl}`;
     const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`;
 
     if (typeof navigator !== 'undefined' && navigator.share) {
       navigator.share({
         title: 'BetweenUs Couple Space',
         text: message,
-        url: appUrl,
+        url: inviteUrl,
       }).catch(() => {
         const opened = window.open(whatsappUrl, '_blank');
         if (!opened) window.location.href = whatsappUrl;
@@ -179,7 +191,25 @@ export const CouplePairingView: React.FC<CouplePairingViewProps> = ({ onClose })
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 mt-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3">
+            <button
+              type="button"
+              onClick={handleCopyLink}
+              className="py-2.5 px-3 rounded-xl border border-rose-200 hover:border-rose-400 bg-rose-50/80 hover:bg-rose-100/80 text-rose-700 font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer"
+            >
+              {copiedLink ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                  <span className="text-emerald-700">Link Copied!</span>
+                </>
+              ) : (
+                <>
+                  <Link2 className="w-3.5 h-3.5 text-rose-500" />
+                  <span>Copy Link</span>
+                </>
+              )}
+            </button>
+
             <button
               type="button"
               onClick={handleCopyCode}
@@ -188,7 +218,7 @@ export const CouplePairingView: React.FC<CouplePairingViewProps> = ({ onClose })
               {copied ? (
                 <>
                   <Check className="w-3.5 h-3.5 text-emerald-600" />
-                  <span className="text-emerald-700">Copied!</span>
+                  <span className="text-emerald-700">Code Copied!</span>
                 </>
               ) : (
                 <>
@@ -204,7 +234,7 @@ export const CouplePairingView: React.FC<CouplePairingViewProps> = ({ onClose })
               className="py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs transition active:scale-95 cursor-pointer"
             >
               <Share2 className="w-3.5 h-3.5" />
-              <span>Send on WhatsApp</span>
+              <span>WhatsApp</span>
             </button>
           </div>
         </div>

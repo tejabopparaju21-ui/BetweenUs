@@ -667,48 +667,6 @@ export async function syncMessageToFirestore(
       return { success: false, error: errText };
     }
 
-    // Pre-check: Ensure the parent couple document exists in Firestore
-    try {
-      const coupleRef = doc(db, 'couples', coupleId);
-      const coupleSnap = await getDoc(coupleRef);
-      if (!coupleSnap.exists()) {
-        const dynamicCode = coupleId.startsWith('couple_') ? coupleId.replace('couple_', '') : generateCoupleCode();
-        await setDoc(coupleRef, {
-          id: coupleId,
-          code: dynamicCode,
-          partnerAId: currentUser.uid,
-          partnerAName: currentUser.displayName || 'Partner 1',
-          partnerBId: '',
-          members: [currentUser.uid],
-          partnerUids: [currentUser.uid],
-          relationshipName: 'Our Sanctuary',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        });
-      } else {
-        const cData = coupleSnap.data();
-        if (
-          cData.partnerAId === 'user_teja_1' ||
-          !cData.members ||
-          !cData.members.includes(currentUser.uid)
-        ) {
-          const members = Array.from(new Set([...(cData.members || []), currentUser.uid].filter(Boolean)));
-          await setDoc(
-            coupleRef,
-            {
-              members,
-              partnerUids: members,
-              partnerAId: (cData.partnerAId === 'user_teja_1' || !cData.partnerAId) ? currentUser.uid : cData.partnerAId,
-              updatedAt: new Date().toISOString(),
-            },
-            { merge: true }
-          );
-        }
-      }
-    } catch (coupleErr) {
-      console.debug('Couple pre-sync check notice:', coupleErr);
-    }
-
     const cleanMessage = sanitizeForFirestore({
       ...message,
       senderId: currentUser.uid, // Strictly use authenticated UID

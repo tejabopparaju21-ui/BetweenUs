@@ -20,7 +20,7 @@ import { CouplePairingView } from './components/CouplePairingView';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 function MainAppContent() {
-  const { activeTab, firebaseUser, isDemoMode, exitDemoMode } = useApp();
+  const { activeTab, firebaseUser, isAuthLoading, isDemoMode, exitDemoMode } = useApp();
   const [showPairingModal, setShowPairingModal] = React.useState(false);
 
   React.useEffect(() => {
@@ -28,6 +28,24 @@ function MainAppContent() {
     window.addEventListener('open_pairing_modal', handleOpenPairing);
     return () => window.removeEventListener('open_pairing_modal', handleOpenPairing);
   }, []);
+
+  // 0. While Firebase auth state is initializing (on refresh / initial load)
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-rose-50 via-white to-pink-50 flex flex-col items-center justify-center p-6 text-center">
+        <div className="relative mb-6">
+          <div className="w-20 h-20 rounded-3xl bg-gradient-to-tr from-rose-500 to-pink-500 shadow-xl shadow-rose-500/25 flex items-center justify-center animate-pulse">
+            <span className="text-3xl">💑</span>
+          </div>
+          <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-white shadow-md flex items-center justify-center text-xs">
+            ✨
+          </div>
+        </div>
+        <h2 className="text-xl font-bold text-gray-900 mb-1">BetweenUs</h2>
+        <p className="text-sm text-gray-500 font-medium">Connecting hearts across the distance...</p>
+      </div>
+    );
+  }
 
   // 1. Unauthenticated and not in Demo Mode -> Display AuthScreen
   if (!firebaseUser && !isDemoMode) {

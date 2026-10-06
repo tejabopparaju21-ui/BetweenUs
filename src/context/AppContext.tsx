@@ -156,6 +156,8 @@ interface AppContextType {
 
   // Firebase Real-Time Cloud Integration & Multi-Tenant Pairing
   firebaseUser: FirebaseUser | null;
+  isAuthLoading: boolean;
+  pendingInviteCode: string | null;
   isFirebaseConnected: boolean;
   firebaseProjectId: string;
   isDemoMode: boolean;
@@ -615,6 +617,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const activeCallRef = useRef<CallSession | null>(null);
   activeCallRef.current = activeCall;
 
+  const userARef = useRef(userA);
+  userARef.current = userA;
+  const userBRef = useRef(userB);
+  userBRef.current = userB;
+  const coupleRef = useRef(couple);
+  coupleRef.current = couple;
+  const activeUserIdRef = useRef(activeUserId);
+  activeUserIdRef.current = activeUserId;
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
+  const lastLocationUpdateRef = useRef<{ lat: number; lng: number; time: number }>({ lat: 0, lng: 0, time: 0 });
+
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
@@ -689,66 +703,133 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Firebase Auth State
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
+  const [pendingInviteCode, setPendingInviteCode] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const urlCode = params.get('code') || params.get('invite') || params.get('pair') || params.get('join');
+      if (urlCode && urlCode.trim()) {
+        const cleanCode = urlCode.trim().toUpperCase();
+        try {
+          sessionStorage.setItem('betweenus_pending_invite_code', cleanCode);
+          localStorage.setItem('betweenus_pending_invite_code', cleanCode);
+        } catch (_) {}
+        return cleanCode;
+      }
+      try {
+        return sessionStorage.getItem('betweenus_pending_invite_code') || localStorage.getItem('betweenus_pending_invite_code') || null;
+      } catch (_) {}
+    }
+    return null;
+  });
+
   const isFirebaseConnected = !!firebaseConfig.projectId;
   const firebaseProjectId = firebaseConfig.projectId;
+
+  // Clean URL search parameters once captured
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const urlCode = params.get('code') || params.get('invite') || params.get('pair') || params.get('join');
+      if (urlCode) {
+        params.delete('code');
+        params.delete('invite');
+        params.delete('pair');
+        params.delete('join');
+        const newSearch = params.toString();
+        const newUrl = window.location.pathname + (newSearch ? `?${newSearch}` : '');
+        window.history.replaceState({}, document.title, newUrl);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     const unsub = subscribeToAuth(async (u) => {
       setFirebaseUser(u);
-      if (u) {
-        setIsDemoMode(false);
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('betweenus_demo_mode');
-        }
+      try {
+        if (u) {
+          setIsDemoMode(false);
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('betweenus_demo_mode');
+          }
 
-        // 1. Get or create personalized user profile from Firestore
-        const profile = await getOrCreateUserProfile(u);
-        setActiveUserId(u.uid);
-        setUserA(profile);
+          // 1. Get or create personalized user profile from Firestore
+          const profile = await getOrCreateUserProfile(u);
+          setActiveUserId(u.uid);
+          setUserA(profile);
 
-        // 2. Query Firestore for this user's couple space
-        let userCouple = await findCoupleForUser(u.uid);
-        if (!userCouple) {
-          // If no couple exists, ensure a pending couple space with their own personal code
-          userCouple = await ensureUserPendingCouple(profile);
-        }
-        setCouple(userCouple);
+          // 2. Query Firestore for this user's couple space
+          let userCouple = await findCoupleForUser(u.uid);
 
-        // 3. Resolve partner profile if paired
-        const partnerUid = userCouple.partnerAId === u.uid ? userCouple.partnerBId : userCouple.partnerAId;
-        if (partnerUid && partnerUid !== u.uid) {
-          const partnerProfile = await getUserProfile(partnerUid);
-          if (partnerProfile) {
-            setUserB(partnerProfile);
+          // 3. Auto-link pending invite code if waiting for partner or newly signed in
+          const storedInvite =
+            sessionStorage.getItem('betweenus_pending_invite_code') ||
+            localStorage.getItem('betweenus_pending_invite_code');
+
+          if (
+            storedInvite &&
+            (!userCouple || userCouple.status === 'waiting_for_partner') &&
+            storedInvite !== profile.coupleCode?.toUpperCase()
+          ) {
+            try {
+              const pairRes = await pairPartnersWithCode(storedInvite, profile);
+              if (pairRes.success && pairRes.couple) {
+                userCouple = pairRes.couple;
+                sessionStorage.removeItem('betweenus_pending_invite_code');
+                localStorage.removeItem('betweenus_pending_invite_code');
+                setPendingInviteCode(null);
+              }
+            } catch (e) {
+              console.debug('Pending invite code auto-pair notice:', e);
+            }
+          }
+
+          if (!userCouple) {
+            // If no couple exists, ensure a pending couple space with their own personal code
+            userCouple = await ensureUserPendingCouple(profile);
+          }
+          setCouple(userCouple);
+
+          // 4. Resolve partner profile if paired
+          const partnerUid = userCouple.partnerAId === u.uid ? userCouple.partnerBId : userCouple.partnerAId;
+          if (partnerUid && partnerUid !== u.uid) {
+            const partnerProfile = await getUserProfile(partnerUid);
+            if (partnerProfile) {
+              setUserB(partnerProfile);
+            } else {
+              const fallbackName = (userCouple.partnerAId === u.uid ? userCouple.partnerBName : userCouple.partnerAName) || 'Partner';
+              setUserB((prev) => ({
+                ...prev,
+                id: partnerUid,
+                uid: partnerUid,
+                name: fallbackName,
+              }));
+            }
           } else {
-            const fallbackName = (userCouple.partnerAId === u.uid ? userCouple.partnerBName : userCouple.partnerAName) || 'Partner';
-            setUserB((prev) => ({
-              ...prev,
-              id: partnerUid,
-              uid: partnerUid,
-              name: fallbackName,
-            }));
+            // Partner slot waiting to be linked
+            setUserB({
+              id: '',
+              uid: '',
+              name: 'Partner',
+              email: '',
+              avatarUrl: '/app-logo.svg',
+              timeZone: 'Asia/Kolkata',
+              anniversaryDate: userCouple.anniversaryDate || new Date().toISOString().split('T')[0],
+              sleepStartHour: 23,
+              sleepEndHour: 7,
+              shareLocation: true,
+              emergencyContacts: [],
+            });
           }
         } else {
-          // Partner slot waiting to be linked
-          setUserB({
-            id: '',
-            uid: '',
-            name: 'Partner',
-            email: '',
-            avatarUrl: '/app-logo.svg',
-            timeZone: 'Asia/Kolkata',
-            anniversaryDate: userCouple.anniversaryDate || new Date().toISOString().split('T')[0],
-            sleepStartHour: 23,
-            sleepEndHour: 7,
-            shareLocation: true,
-            emergencyContacts: [],
-          });
+          if (isDemoMode) {
+            setCouple((prev) => prev || DEFAULT_COUPLE);
+          }
         }
-      } else {
-        if (isDemoMode) {
-          setCouple((prev) => prev || DEFAULT_COUPLE);
-        }
+      } catch (authErr) {
+        console.warn('Auth user initialization notice:', authErr);
+      } finally {
+        setIsAuthLoading(false);
       }
     });
     return () => unsub();
@@ -764,6 +845,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [firebaseUser, activeUserId]);
 
+  const readReceiptsSentRef = useRef<Set<string>>(new Set());
+
   // Listen to Firestore real-time updates for the couple document and messages ONLY when authenticated & connected
   useEffect(() => {
     if (!couple?.id || !firebaseUser) {
@@ -778,31 +861,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       couple.id,
       (cloudMsgs) => {
         setMessages((prevLocal) => {
-          if (!cloudMsgs || cloudMsgs.length === 0) return prevLocal;
-          const cloudIds = new Set(cloudMsgs.map((m) => m.id));
+          const cloudIds = new Set((cloudMsgs || []).map((m) => m.id));
           // Keep recent local optimistic messages sent within last 15 seconds that might still be syncing
           const pendingRecent = prevLocal.filter(
-            (m) => !cloudIds.has(m.id) && Date.now() - new Date(m.createdAt).getTime() < 15000
+            (m) => !cloudIds.has(m.id) && m.senderId === firebaseUser.uid && Date.now() - new Date(m.createdAt).getTime() < 15000
           );
-          const merged = [...cloudMsgs, ...pendingRecent];
+          const merged = [...(cloudMsgs || []), ...pendingRecent];
           merged.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
           return merged;
         });
         setIsChatSyncing(false);
         setChatError(null);
 
-        // Functional Read Receipts: Mark unread messages sent by the partner as read
-        cloudMsgs.forEach((msg) => {
-          if (
-            msg.senderId !== firebaseUser.uid &&
-            (!msg.readBy || !msg.readBy.includes(firebaseUser.uid) || msg.status !== 'read')
-          ) {
-            markMessageAsReadInFirestore(couple.id, msg.id, firebaseUser.uid);
-          }
-        });
+        // Functional Read Receipts: ONLY mark unread messages as read if user is viewing chat tab
+        if (activeTab === 'chat' && cloudMsgs && cloudMsgs.length > 0) {
+          cloudMsgs.forEach((msg) => {
+            if (
+              msg.senderId !== firebaseUser.uid &&
+              (!msg.readBy || !msg.readBy.includes(firebaseUser.uid) || msg.status !== 'read') &&
+              !readReceiptsSentRef.current.has(msg.id)
+            ) {
+              readReceiptsSentRef.current.add(msg.id);
+              markMessageAsReadInFirestore(couple.id, msg.id, firebaseUser.uid);
+            }
+          });
+        }
       },
       (error) => {
         setIsChatSyncing(false);
+        setChatError('Connection interrupted. Reconnecting chat...');
         console.warn('Real-time chat listener notice:', error);
       }
     );
@@ -1128,7 +1215,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       // Safeguard: Deduplicate call cards sent within 15 seconds
       if (mediaType === 'call') {
-        const isDuplicateCallMsg = messages.some((m) => {
+        const isDuplicateCallMsg = messagesRef.current.some((m) => {
           if (m.type !== 'call' && m.mediaType !== 'call') return false;
           const timeDiff = Math.abs(Date.now() - new Date(m.createdAt).getTime());
           return (
@@ -1213,58 +1300,62 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       }
     },
-    [activeUserId, couple, currentUser.id, currentUser.name, firebaseUser, messages, partnerUser.name, saveAndBroadcast]
+    [activeUserId, couple, currentUser.id, currentUser.name, firebaseUser, partnerUser.name, saveAndBroadcast]
   );
 
   const deleteMessage = useCallback(
     (id: string) => {
-      const updated = messages.filter((m) => m.id !== id);
-      setMessages(updated);
-      saveAndBroadcast({ messages: updated });
-      if (couple) {
-        deleteMessageFromFirestore(couple.id, id);
+      setMessages((prev) => {
+        const updated = prev.filter((m) => m.id !== id);
+        saveAndBroadcast({ messages: updated });
+        return updated;
+      });
+      if (coupleRef.current) {
+        deleteMessageFromFirestore(coupleRef.current.id, id);
       }
     },
-    [couple, messages, saveAndBroadcast]
+    [saveAndBroadcast]
   );
 
   const clearChatMessages = useCallback(
     async () => {
       setMessages([]);
       saveAndBroadcast({ messages: [] });
-      if (couple) {
-        await clearMessagesFromFirestore(couple.id);
+      if (coupleRef.current) {
+        await clearMessagesFromFirestore(coupleRef.current.id);
       }
     },
-    [couple, saveAndBroadcast]
+    [saveAndBroadcast]
   );
 
   const toggleMessageReaction = useCallback(
     (messageId: string, emoji: string) => {
       let targetMsg: ChatMessage | null = null;
-      const updated = messages.map((m) => {
-        if (m.id !== messageId) return m;
-        const existingIdx = m.reactions.findIndex((r) => r.userId === currentUser.id);
-        let newReactions = [...m.reactions];
-        if (existingIdx >= 0) {
-          if (newReactions[existingIdx].emoji === emoji) {
-            newReactions.splice(existingIdx, 1);
+      setMessages((prev) => {
+        const updated = prev.map((m) => {
+          if (m.id !== messageId) return m;
+          const existingIdx = m.reactions.findIndex((r) => r.userId === currentUser.id);
+          let newReactions = [...m.reactions];
+          if (existingIdx >= 0) {
+            if (newReactions[existingIdx].emoji === emoji) {
+              newReactions.splice(existingIdx, 1);
+            } else {
+              newReactions[existingIdx] = { userId: currentUser.id, emoji };
+            }
           } else {
-            newReactions[existingIdx] = { userId: currentUser.id, emoji };
+            newReactions.push({ userId: currentUser.id, emoji });
           }
-        } else {
-          newReactions.push({ userId: currentUser.id, emoji });
-        }
-        targetMsg = { ...m, reactions: newReactions };
-        return targetMsg;
+          targetMsg = { ...m, reactions: newReactions };
+          return targetMsg;
+        });
+        saveAndBroadcast({ messages: updated });
+        return updated;
       });
-      setMessages(updated);
-      saveAndBroadcast({ messages: updated });
-      if (couple && targetMsg) {
-        syncMessageToFirestore(couple.id, targetMsg);
+      if (coupleRef.current && targetMsg) {
+        syncMessageToFirestore(coupleRef.current.id, targetMsg);
       }
     },
-    [couple, currentUser.id, messages, saveAndBroadcast]
+    [currentUser.id, saveAndBroadcast]
   );
 
   // 2. Quick Love Actions (Love you, Hug, Kiss, Miss you, Thinking of you)
@@ -1699,15 +1790,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setIsLocating(true);
       setLocationError(null);
 
-      // Determine target user
+      // Determine target user from stable refs
+      const curUserA = userARef.current;
+      const curUserB = userBRef.current;
+      const curActiveId = activeUserIdRef.current;
+
       let isTargetA = true;
       if (targetSlot === 'current') {
-        isTargetA = activeUserId === userA.id;
+        isTargetA = curActiveId === curUserA.id;
       } else {
         isTargetA = targetSlot === 'userA';
       }
 
-      const targetUser = isTargetA ? userA : userB;
+      const targetUser = isTargetA ? curUserA : curUserB;
       const targetUserId = targetUser.uid || targetUser.id;
 
       if (!('geolocation' in navigator)) {
@@ -1731,11 +1826,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const accuracy = pos.coords.accuracy;
           const timestamp = pos.timestamp || Date.now();
 
-          // Optional Geoapify reverse geocoding
+          // Distance and time throttling check
+          const now = Date.now();
+          const last = lastLocationUpdateRef.current;
+          const latDiff = Math.abs(lat - last.lat) * 111320;
+          const lngDiff = Math.abs(lng - last.lng) * 111320 * Math.cos((lat * Math.PI) / 180);
+          const distMeters = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
+          const shouldSyncCloud = now - last.time >= 30000 || distMeters >= 25 || last.time === 0;
+
+          // Optional Geoapify reverse geocoding only when significant movement or initial
           let addressName: string | null = null;
-          try {
-            addressName = await reverseGeocodeWithGeoapify(lat, lng);
-          } catch (_) {}
+          if (shouldSyncCloud) {
+            try {
+              addressName = await reverseGeocodeWithGeoapify(lat, lng);
+            } catch (_) {}
+          }
 
           const closestCity = findClosestIndianCity(lat, lng);
           const cityDisplayName =
@@ -1753,55 +1858,76 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           };
 
           if (isTargetA) {
-            const updated = {
-              ...userA,
-              shareLocation: true,
-              city: cleanCityName,
-              location: newLocation,
-            };
-            setUserA(updated);
-            saveAndBroadcast({ userA: updated });
-            syncUserToFirestore(updated);
-            if (couple) {
-              syncPartnerLocationToFirestore(
-                couple.id,
-                'partnerA',
-                newLocation,
-                true,
-                cleanCityName
-              );
+            setUserA((prevA) => {
+              const updated = {
+                ...prevA,
+                shareLocation: true,
+                city: cleanCityName,
+                location: newLocation,
+              };
+              saveAndBroadcast({ userA: updated });
+              return updated;
+            });
+            if (shouldSyncCloud) {
+              syncUserToFirestore({
+                ...curUserA,
+                shareLocation: true,
+                city: cleanCityName,
+                location: newLocation,
+              });
+              if (coupleRef.current) {
+                syncPartnerLocationToFirestore(
+                  coupleRef.current.id,
+                  'partnerA',
+                  newLocation,
+                  true,
+                  cleanCityName
+                );
+              }
             }
           } else {
-            const updated = {
-              ...userB,
-              shareLocation: true,
-              city: cleanCityName,
-              location: newLocation,
-            };
-            setUserB(updated);
-            saveAndBroadcast({ userB: updated });
-            syncUserToFirestore(updated);
-            if (couple) {
-              syncPartnerLocationToFirestore(
-                couple.id,
-                'partnerB',
-                newLocation,
-                true,
-                cleanCityName
-              );
+            setUserB((prevB) => {
+              const updated = {
+                ...prevB,
+                shareLocation: true,
+                city: cleanCityName,
+                location: newLocation,
+              };
+              saveAndBroadcast({ userB: updated });
+              return updated;
+            });
+            if (shouldSyncCloud) {
+              syncUserToFirestore({
+                ...curUserB,
+                shareLocation: true,
+                city: cleanCityName,
+                location: newLocation,
+              });
+              if (coupleRef.current) {
+                syncPartnerLocationToFirestore(
+                  coupleRef.current.id,
+                  'partnerB',
+                  newLocation,
+                  true,
+                  cleanCityName
+                );
+              }
             }
           }
 
-          // Save to Firebase Realtime Database at locations/{userId}
-          await saveLiveLocationToRTDB(targetUserId, {
-            latitude: lat,
-            longitude: lng,
-            accuracy: accuracy ? Math.round(accuracy) : 0,
-            timestamp,
-            sharing: true,
-            displayName: targetUser.name,
-            address: cityDisplayName,
-          });
+          if (shouldSyncCloud) {
+            lastLocationUpdateRef.current = { lat, lng, time: now };
+            // Save to Firebase Realtime Database at locations/{userId}
+            await saveLiveLocationToRTDB(targetUserId, {
+              latitude: lat,
+              longitude: lng,
+              accuracy: accuracy ? Math.round(accuracy) : 0,
+              timestamp,
+              sharing: true,
+              displayName: targetUser.name,
+              address: cityDisplayName,
+            });
+          }
 
           setIsLocating(false);
           setLocationError(null);
@@ -1837,8 +1963,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             handleError,
             {
               enableHighAccuracy: true,
-              maximumAge: 5000,
-              timeout: 10000,
+              maximumAge: 10000,
+              timeout: 15000,
             }
           );
         } catch (watchErr: any) {
@@ -1851,17 +1977,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       });
     },
-    [activeUserId, couple, saveAndBroadcast, userA, userB]
+    [saveAndBroadcast]
   );
 
-  // Automatically activate live continuous GPS tracking without requiring clicking any start button
+  // Activate live continuous GPS tracking safely without infinite loop
   useEffect(() => {
     if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
-      requestLocationPermission('current').catch((err) => {
-        console.warn('Auto GPS continuous tracking init:', err);
-      });
+      const activeUser = activeUserIdRef.current === userARef.current.id ? userARef.current : userBRef.current;
+      if (activeUser?.shareLocation) {
+        requestLocationPermission('current').catch((err) => {
+          console.warn('Auto GPS continuous tracking notice:', err);
+        });
+      }
     }
-  }, [activeUserId, requestLocationPermission]);
+  }, [requestLocationPermission]);
 
   const setPartnerLocationManually = useCallback(
     (
@@ -2024,7 +2153,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setIsChatSyncing(false);
         if (res.success && res.couple) {
           setCouple(res.couple);
-          saveAndBroadcast({ couple: res.couple });
+          // Start chat fresh for new couple connection
+          setMessages([]);
+          saveAndBroadcast({ couple: res.couple, messages: [] });
           const partnerUid = res.couple.partnerAId === currentUser.id ? res.couple.partnerBId : res.couple.partnerAId;
           if (partnerUid) {
             const pProfile = await getUserProfile(partnerUid);
@@ -2041,7 +2172,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return { success: false, message: err?.message || 'Connection failed. Please check internet.' };
       }
     },
-    [currentUser, saveAndBroadcast]
+    [currentUser, firebaseUser, saveAndBroadcast]
   );
 
   const unlinkCurrentCouple = useCallback(async () => {
@@ -2049,6 +2180,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       await unlinkCoupleInFirestore(couple.id, currentUser.id);
       const pending = await ensureUserPendingCouple(currentUser);
       setCouple(pending);
+      setMessages([]);
       setUserB({
         id: '',
         uid: '',
@@ -2062,7 +2194,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         shareLocation: true,
         emergencyContacts: [],
       });
-      saveAndBroadcast({ couple: pending });
+      saveAndBroadcast({ couple: pending, messages: [] });
     }
   }, [couple, currentUser, saveAndBroadcast]);
 
@@ -2467,6 +2599,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     <AppContext.Provider
       value={{
         firebaseUser,
+        isAuthLoading,
+        pendingInviteCode,
         isFirebaseConnected,
         firebaseProjectId,
         isDemoMode,

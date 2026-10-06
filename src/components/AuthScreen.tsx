@@ -4,7 +4,7 @@ import { useApp } from '../context/AppContext';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 export const AuthScreen: React.FC = () => {
-  const { loginWithGoogle, loginWithEmail, registerWithEmail, enterDemoMode } = useApp();
+  const { loginWithGoogle, loginWithEmail, registerWithEmail, enterDemoMode, pendingInviteCode } = useApp();
   const [isEmailMode, setIsEmailMode] = useState(false);
   const [isRegister, setIsRegister] = useState(false);
   const [email, setEmail] = useState('');
@@ -117,6 +117,19 @@ export const AuthScreen: React.FC = () => {
 
       {/* Main Auth Actions Container */}
       <div className="w-full max-w-md mx-auto my-6 bg-white/90 backdrop-blur-md rounded-3xl p-6 sm:p-7 border border-rose-100 shadow-xl shadow-rose-100/50">
+        {pendingInviteCode && (
+          <div className="mb-5 p-3.5 rounded-2xl bg-gradient-to-r from-rose-500/10 via-pink-500/10 to-rose-500/10 border border-rose-300 text-slate-800 text-xs flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-rose-500 text-white flex items-center justify-center font-bold text-sm shrink-0">
+              💌
+            </div>
+            <div className="flex-1">
+              <p className="font-bold text-rose-900">Partner Invitation Detected</p>
+              <p className="text-[11px] text-slate-600">
+                You've been invited with code <span className="font-mono font-black text-rose-700 bg-rose-100 px-1.5 py-0.5 rounded-md">{pendingInviteCode}</span>! Sign in below to automatically connect.
+              </p>
+            </div>
+          </div>
+        )}
         {error && (
           error.includes('unauthorized-domain') ? (
             <div className="mb-5 p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-950 text-xs space-y-3 animate-in fade-in shadow-xs">
