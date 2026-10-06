@@ -27,7 +27,6 @@ export const Navigation: React.FC = () => {
     partnerUser,
     couple,
     isDemoMode,
-    switchActiveUser,
     notifications,
     markNotificationRead,
     clearAllNotifications,
@@ -49,7 +48,6 @@ export const Navigation: React.FC = () => {
     { id: 'chat', label: 'Chat', icon: MessageCircleHeart, badge: 1 },
     { id: 'connect', label: 'Connect', icon: HeartHandshake },
     { id: 'memories', label: 'Memories', icon: ImageIcon },
-    { id: 'ai', label: 'AI Love', icon: Sparkles },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
@@ -222,7 +220,7 @@ export const Navigation: React.FC = () => {
             ) : (
               <>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="font-extrabold text-slate-800 text-xs">Switch Demo Partner</span>
+                  <span className="font-extrabold text-slate-800 text-xs">Your Profile</span>
                   <button
                     onClick={() => setShowUserSwitcher(false)}
                     className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer"
@@ -230,38 +228,14 @@ export const Navigation: React.FC = () => {
                     <X className="w-4 h-4" />
                   </button>
                 </div>
-                <p className="text-[11px] text-slate-500 mb-3">
-                  Preview BetweenUs from either perspective:
-                </p>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    onClick={() => {
-                      switchActiveUser('user_teja_1');
-                      setShowUserSwitcher(false);
-                    }}
-                    className={`py-2 px-3 rounded-xl font-bold flex items-center justify-center gap-1.5 transition text-xs cursor-pointer ${
-                      currentUser.id === 'user_teja_1'
-                        ? 'bg-gradient-to-r from-rose-500 to-pink-500 text-white shadow-xs'
-                        : 'bg-slate-100 text-slate-700 hover:bg-rose-50'
-                    }`}
-                  >
-                    <span>Teja</span>
-                    {currentUser.id === 'user_teja_1' && <Check className="w-3.5 h-3.5" />}
-                  </button>
-                  <button
-                    onClick={() => {
-                      switchActiveUser(partnerUser.id);
-                      setShowUserSwitcher(false);
-                    }}
-                    className={`py-2 px-3 rounded-xl font-bold flex items-center justify-center gap-1.5 transition text-xs cursor-pointer ${
-                      currentUser.id === partnerUser.id
-                        ? 'bg-gradient-to-r from-rose-500 to-pink-500 text-white shadow-xs'
-                        : 'bg-slate-100 text-slate-700 hover:bg-rose-50'
-                    }`}
-                  >
-                    <span>{partnerUser.name}</span>
-                    {currentUser.id === partnerUser.id && <Check className="w-3.5 h-3.5" />}
-                  </button>
+                <div className="flex items-center gap-2.5 p-2 rounded-2xl bg-rose-50/70 border border-rose-100">
+                  <div className="w-8 h-8 rounded-full bg-rose-500 text-white font-bold flex items-center justify-center text-xs shrink-0">
+                    {currentUser.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="font-bold text-slate-800 text-xs truncate">{currentUser.name}</div>
+                    <div className="text-[10px] text-slate-500">Connected with {partnerUser.name}</div>
+                  </div>
                 </div>
               </>
             )}
@@ -274,7 +248,7 @@ export const Navigation: React.FC = () => {
 
       {/* Bottom Sticky Mobile Navigation - Native App Feel */}
       <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/92 backdrop-blur-xl border-t border-rose-100/80 pb-safe shadow-[0_-4px_25px_rgba(244,63,94,0.06)]">
-        <div className="max-w-md md:max-w-2xl mx-auto grid grid-cols-6 py-1 px-1 sm:px-3">
+        <div className="max-w-md md:max-w-2xl mx-auto grid grid-cols-5 py-1 px-1 sm:px-3">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
@@ -293,9 +267,6 @@ export const Navigation: React.FC = () => {
                   }`}
                 >
                   <Icon className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
-                  {item.id === 'ai' && (
-                    <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-                  )}
                   {item.id === 'chat' && (
                     <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-rose-500" />
                   )}

@@ -751,6 +751,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => unsub();
   }, [isDemoMode]);
 
+  // Lock device identity: prevent account switching from partner's phone
+  useEffect(() => {
+    if (firebaseUser?.uid && activeUserId !== firebaseUser.uid) {
+      setActiveUserId(firebaseUser.uid);
+      try {
+        localStorage.setItem('betweenus_device_user_id', firebaseUser.uid);
+      } catch (e) {}
+    }
+  }, [firebaseUser, activeUserId]);
+
   // Listen to Firestore real-time updates for the couple document and messages ONLY when authenticated & connected
   useEffect(() => {
     if (!couple?.id || !firebaseUser) {
@@ -1079,11 +1089,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [partnerUser.id, partnerUser.uid, userA.id]);
 
   const switchActiveUser = useCallback((userId: string) => {
+    // Strictly prevent switching accounts from partner's phone if authenticated
+    if (firebaseUser?.uid) {
+      setActiveUserId(firebaseUser.uid);
+      try {
+        localStorage.setItem('betweenus_device_user_id', firebaseUser.uid);
+      } catch (e) {}
+      return;
+    }
     setActiveUserId(userId);
     try {
       localStorage.setItem('betweenus_device_user_id', userId);
     } catch (e) {}
-  }, []);
+  }, [firebaseUser]);
 
   // 1. Chat Message Actions
   const sendMessage = useCallback(
@@ -1815,6 +1833,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     },
     [activeUserId, couple, saveAndBroadcast, userA, userB]
   );
+
+  // Automatically activate live continuous GPS tracking without requiring clicking any start button
+  useEffect(() => {
+    if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
+      requestLocationPermission('current').catch((err) => {
+        console.warn('Auto GPS continuous tracking init:', err);
+      });
+    }
+  }, [activeUserId, requestLocationPermission]);
 
   const setPartnerLocationManually = useCallback(
     (

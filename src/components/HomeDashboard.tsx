@@ -26,7 +26,6 @@ import {
   ShieldCheck,
   Send,
   Eye,
-  EyeOff,
   Flame,
   Award,
   Navigation2,
@@ -50,7 +49,6 @@ export const HomeDashboard: React.FC = () => {
     setActiveTab,
     quickLoveBurst,
     requestLocationPermission,
-    stopSharingLocation,
   } = useApp();
 
   const [currentTimeTick, setCurrentTimeTick] = useState(Date.now());
@@ -374,21 +372,21 @@ export const HomeDashboard: React.FC = () => {
               </div>
             </button>
 
-            {/* 5. Love Companion */}
+            {/* 5. Couple Games & Quiz */}
             <button
               type="button"
-              onClick={() => setActiveTab('ai')}
+              onClick={() => setActiveTab('connect')}
               className="p-3.5 rounded-2xl bg-white hover:bg-rose-50/50 border border-rose-100 shadow-2xs text-left transition tap-bounce group cursor-pointer flex flex-col justify-between min-h-[74px]"
             >
               <div className="flex items-center justify-between">
                 <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center group-hover:scale-110 transition">
                   <Sparkles className="w-4 h-4" />
                 </div>
-                <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-md">AI</span>
+                <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-md">Quiz</span>
               </div>
               <div>
-                <div className="font-extrabold text-xs text-slate-800">Love Companion</div>
-                <div className="text-[10px] text-slate-400 truncate">Date ideas & notes</div>
+                <div className="font-extrabold text-xs text-slate-800">Couple Quiz</div>
+                <div className="text-[10px] text-slate-400 truncate">Fun questions & prompts</div>
               </div>
             </button>
 
@@ -783,10 +781,10 @@ export const HomeDashboard: React.FC = () => {
               "Send each other a photo of what the sky looks like right now outside your window, and share one small win from your day."
             </p>
             <button
-              onClick={() => setActiveTab('ai')}
+              onClick={() => setActiveTab('chat')}
               className="mt-2 text-xs font-bold text-amber-800 hover:text-amber-900 inline-flex items-center gap-1"
             >
-              <span>Explore AI Love Companion</span>
+              <span>Share in Couple Chat</span>
               <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -867,23 +865,16 @@ export const HomeDashboard: React.FC = () => {
               <span className="font-bold text-slate-800 text-xs truncate block">
                 {currentUser.city || 'Hyderabad'}
               </span>
-              <span className="text-[10px] text-slate-500 block truncate">
-                {currentUser.shareLocation ? '🟢 Sharing GPS' : '🔴 Location Paused'}
+              <span className="text-[10px] text-emerald-600 font-bold block truncate">
+                🟢 GPS Always ON
               </span>
             </div>
-            <button
-              onClick={() => {
-                if (currentUser.shareLocation) {
-                  stopSharingLocation('current');
-                } else {
-                  requestLocationPermission('current');
-                }
-              }}
-              className="p-1.5 rounded-xl bg-white text-slate-600 hover:text-rose-600 border border-rose-200 shrink-0 shadow-2xs"
-              title={currentUser.shareLocation ? 'Pause your location' : 'Enable your location'}
+            <div
+              className="p-1.5 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 shrink-0 shadow-2xs"
+              title="Continuous Live GPS Active"
             >
-              {currentUser.shareLocation ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-            </button>
+              <Navigation2 className="w-3.5 h-3.5 rotate-45 animate-pulse" />
+            </div>
           </div>
 
           {/* Partner Tile */}

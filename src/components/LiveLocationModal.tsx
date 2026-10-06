@@ -6,8 +6,6 @@ import {
   MapPin,
   Navigation2,
   ShieldCheck,
-  Eye,
-  EyeOff,
   RefreshCw,
   X,
   Check,
@@ -33,8 +31,6 @@ export const LiveLocationModal: React.FC<LiveLocationModalProps> = ({ isOpen, on
     clearLocationError,
     requestLocationPermission,
     setPartnerLocationManually,
-    stopSharingLocation,
-    switchActiveUser,
   } = useApp();
 
   const [selectedCityUserA, setSelectedCityUserA] = useState<string>(currentUser.city || 'Hyderabad');
@@ -205,29 +201,16 @@ export const LiveLocationModal: React.FC<LiveLocationModalProps> = ({ isOpen, on
                     You
                   </span>
                 </span>
-                <span className="text-[11px] text-slate-500 block">
-                  {currentUser.shareLocation ? '🟢 Live Sharing Active' : '🔴 Location Paused'}
+                <span className="text-[11px] text-emerald-600 font-bold block">
+                  🟢 GPS Always ON (Continuous Tracking)
                 </span>
               </div>
             </div>
 
-            {currentUser.shareLocation ? (
-              <button
-                onClick={() => stopSharingLocation('current')}
-                className="px-2.5 py-1 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 text-xs font-bold flex items-center gap-1 transition shadow-2xs"
-              >
-                <EyeOff className="w-3.5 h-3.5 text-slate-500" />
-                <span>Pause</span>
-              </button>
-            ) : (
-              <button
-                onClick={() => handleDetectGPS('current')}
-                className="px-2.5 py-1 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold flex items-center gap-1 transition shadow-2xs"
-              >
-                <Eye className="w-3.5 h-3.5" />
-                <span>Enable</span>
-              </button>
-            )}
+            <div className="px-2.5 py-1 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold flex items-center gap-1.5 shadow-2xs">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+              <span>Always Active</span>
+            </div>
           </div>
 
           {/* Current coordinates & City details */}
@@ -257,7 +240,7 @@ export const LiveLocationModal: React.FC<LiveLocationModalProps> = ({ isOpen, on
                 className="flex-1 py-2 px-3 rounded-xl bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-700 hover:to-pink-700 text-white font-bold text-xs shadow-xs transition flex items-center justify-center gap-1.5 disabled:opacity-60"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isLocating ? 'animate-spin' : ''}`} />
-                <span>{isLocating ? 'Acquiring GPS...' : 'Detect My Live GPS'}</span>
+                <span>{isLocating ? 'Refreshing Live GPS...' : '⟳ Refresh Live GPS'}</span>
               </button>
             </div>
 
@@ -310,16 +293,9 @@ export const LiveLocationModal: React.FC<LiveLocationModalProps> = ({ isOpen, on
               </div>
             </div>
 
-            <button
-              onClick={() => {
-                switchActiveUser(partnerUser.id);
-                triggerSuccess(`Switched active view to ${partnerUser.name}!`);
-              }}
-              className="px-2.5 py-1 rounded-xl bg-white border border-pink-200 text-pink-700 hover:bg-pink-50 text-xs font-bold transition flex items-center gap-1 shadow-2xs"
-              title="Switch to partner view"
-            >
-              <span>Switch to {partnerUser.name}</span>
-            </button>
+            <div className="px-2.5 py-1 rounded-xl bg-white border border-pink-200 text-pink-700 text-xs font-bold flex items-center gap-1 shadow-2xs">
+              <span>{partnerUser.shareLocation ? '🟢 Live Partner' : '📍 Synced Location'}</span>
+            </div>
           </div>
 
           {/* Partner coordinates & City details */}

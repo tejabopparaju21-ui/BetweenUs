@@ -46,7 +46,6 @@ export const CoupleChat: React.FC = () => {
     currentUser,
     partnerUser,
     couple,
-    switchActiveUser,
     messages,
     sendMessage,
     deleteMessage,
@@ -489,15 +488,13 @@ export const CoupleChat: React.FC = () => {
           </span>
         </div>
 
-        {/* 1-Click Perspective Switcher */}
-        <button
-          onClick={() => switchActiveUser(partnerUser.id)}
-          className="text-[11px] font-bold text-rose-600 hover:text-rose-700 bg-white hover:bg-rose-50 px-2.5 py-1 rounded-xl border border-rose-200 shadow-2xs transition flex items-center gap-1.5 active:scale-95"
-          title={`Switch view to send and read as ${partnerUser.name}`}
-        >
-          <ArrowLeftRight className="w-3 h-3 text-rose-500" />
-          <span>Switch to {partnerUser.name}</span>
-        </button>
+        {/* Partner Connection Label */}
+        <div className="flex items-center gap-1.5 text-[11px] text-slate-500 font-medium">
+          <span>With</span>
+          <span className="font-extrabold text-rose-600 bg-white px-2 py-0.5 rounded-lg border border-rose-200/60 shadow-2xs">
+            {partnerUser.name}
+          </span>
+        </div>
       </div>
 
       {/* Network or Sync Error Banner */}

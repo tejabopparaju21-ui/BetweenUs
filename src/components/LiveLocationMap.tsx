@@ -354,14 +354,16 @@ export const LiveLocationMap: React.FC<LiveLocationMapProps> = () => {
   const userTrailPolylineRef = useRef<L.Polyline | null>(null);
   const partnerTrailPolylineRef = useRef<L.Polyline | null>(null);
 
-  // Toggle Live Location Sharing
-  const handleToggleSharing = async () => {
-    if (isUserSharing) {
-      stopSharingLocation('current');
-    } else {
-      hasAutoCenteredRef.current = false;
-      await requestLocationPermission('current');
+  // Auto-start continuous GPS on mount so user never needs to click start
+  useEffect(() => {
+    if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
+      requestLocationPermission('current').catch(() => {});
     }
+  }, [requestLocationPermission]);
+
+  const handleToggleSharing = async () => {
+    hasAutoCenteredRef.current = false;
+    await requestLocationPermission('current');
   };
 
   // Record trail coordinates when positions change
@@ -474,23 +476,16 @@ export const LiveLocationMap: React.FC<LiveLocationMapProps> = () => {
           </div>
         </div>
 
-        {/* Start / Stop Button */}
+        {/* Always-ON GPS Button */}
         <button
           type="button"
           onClick={handleToggleSharing}
           disabled={isLocating}
-          className={`min-h-[40px] px-3.5 py-1.5 rounded-xl font-bold text-xs shadow-sm transition active:scale-95 flex items-center gap-1.5 cursor-pointer shrink-0 ${
-            isUserSharing
-              ? 'bg-red-500 hover:bg-red-600 text-white shadow-red-500/20'
-              : 'bg-rose-600 hover:bg-rose-700 text-white shadow-rose-600/20'
-          }`}
+          className="min-h-[40px] px-3.5 py-1.5 rounded-xl font-bold text-xs shadow-sm transition active:scale-95 flex items-center gap-1.5 cursor-pointer shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20"
+          title="GPS is Always ON - Tap to re-sync sensors"
         >
-          {isLocating ? (
-            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-          ) : (
-            <Navigation className="w-3.5 h-3.5" />
-          )}
-          <span>{isUserSharing ? 'Stop' : 'Share GPS'}</span>
+          <RefreshCw className={`w-3.5 h-3.5 ${isLocating ? 'animate-spin' : ''}`} />
+          <span>{isLocating ? 'Syncing...' : '🟢 GPS Always ON'}</span>
         </button>
       </div>
 
@@ -628,9 +623,9 @@ export const LiveLocationMap: React.FC<LiveLocationMapProps> = () => {
             <span className="text-[10px] text-slate-400 font-bold block uppercase tracking-wider">
               Live Location
             </span>
-            <span className={`font-bold text-xs flex items-center gap-1 mt-0.5 ${isUserSharing ? 'text-emerald-600' : 'text-slate-600'}`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${isUserSharing ? 'bg-emerald-500 animate-ping' : 'bg-slate-400'}`} />
-              <span>{isUserSharing ? 'ACTIVE (ON)' : 'PAUSED (OFF)'}</span>
+            <span className="font-bold text-xs flex items-center gap-1 mt-0.5 text-emerald-600">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+              <span>{isUserSharing ? 'ACTIVE (ALWAYS ON)' : 'ACQUIRING GPS...'}</span>
             </span>
           </div>
 

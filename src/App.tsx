@@ -10,7 +10,6 @@ import { HomeDashboard } from './components/HomeDashboard';
 import { CoupleChat } from './components/CoupleChat';
 import { ConnectSection } from './components/ConnectSection';
 import { MemoriesSection } from './components/MemoriesSection';
-import { AICompanion } from './components/AICompanion';
 import { SettingsSection } from './components/SettingsSection';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { EmergencyAlertModal } from './components/EmergencyAlertModal';
@@ -82,7 +81,6 @@ function MainAppContent() {
         {activeTab === 'chat' && <CoupleChat />}
         {activeTab === 'connect' && <ConnectSection />}
         {activeTab === 'memories' && <MemoriesSection />}
-        {activeTab === 'ai' && <AICompanion />}
         {activeTab === 'settings' && <SettingsSection />}
       </main>
     </div>
