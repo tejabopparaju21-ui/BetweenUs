@@ -17,6 +17,8 @@ import {
   X,
   Check,
   Download,
+  Phone,
+  Video,
 } from 'lucide-react';
 
 export const Navigation: React.FC = () => {
@@ -33,6 +35,7 @@ export const Navigation: React.FC = () => {
     firebaseUser,
     loginWithGoogle,
     logOutFirebase,
+    startCall,
   } = useApp();
 
   const [isEmergencyOpen, setIsEmergencyOpen] = useState(false);
@@ -75,8 +78,29 @@ export const Navigation: React.FC = () => {
             </div>
           </button>
 
-          {/* Right Header Actions: Essential controls with comfortable 44px touch targets */}
+          {/* Right Header Actions: Direct Call access + Essential controls */}
           <div className="flex items-center gap-1.5 sm:gap-2">
+            {/* Quick 1-Tap Voice & Video Call Buttons for Phones & Laptops */}
+            <div className="flex items-center gap-1 bg-rose-50/80 p-0.5 rounded-full border border-rose-200/60 shadow-2xs">
+              <button
+                type="button"
+                onClick={() => startCall('voice')}
+                className="w-8 h-8 rounded-full bg-white hover:bg-rose-100 text-rose-600 flex items-center justify-center transition active:scale-90 shadow-2xs cursor-pointer"
+                title={`Voice Call with ${partnerUser.name}`}
+                aria-label="Voice Call"
+              >
+                <Phone className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => startCall('video')}
+                className="w-8 h-8 rounded-full bg-gradient-to-tr from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 text-white flex items-center justify-center transition active:scale-90 shadow-2xs shadow-rose-500/25 cursor-pointer"
+                title={`Video Call with ${partnerUser.name}`}
+                aria-label="Video Call"
+              >
+                <Video className="w-3.5 h-3.5" />
+              </button>
+            </div>
             {/* Quick Multi-Partner Switcher pill/avatar */}
             <button
               onClick={() => setShowUserSwitcher(!showUserSwitcher)}

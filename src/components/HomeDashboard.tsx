@@ -31,6 +31,8 @@ import {
   Navigation2,
   Compass,
   RefreshCw,
+  Phone,
+  Video,
 } from 'lucide-react';
 import { LiveLocationModal } from './LiveLocationModal';
 import { LiveLocationMap } from './LiveLocationMap';
@@ -49,6 +51,7 @@ export const HomeDashboard: React.FC = () => {
     setActiveTab,
     quickLoveBurst,
     requestLocationPermission,
+    startCall,
   } = useApp();
 
   const [currentTimeTick, setCurrentTimeTick] = useState(Date.now());
@@ -264,6 +267,28 @@ export const HomeDashboard: React.FC = () => {
               </div>
             </div>
 
+            {/* Direct 1-Tap Voice & Video Call on Phones & Laptops */}
+            <div className="mt-3.5 pt-3 border-t border-white/20 flex items-center justify-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => startCall('voice')}
+                className="flex-1 py-2 px-3 rounded-2xl bg-white/20 hover:bg-white/30 text-white font-bold text-xs flex items-center justify-center gap-2 transition active:scale-95 cursor-pointer backdrop-blur-md shadow-xs border border-white/25"
+                title={`Voice Call with ${partnerUser.name}`}
+              >
+                <Phone className="w-3.5 h-3.5 text-rose-300" />
+                <span>Voice Call</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => startCall('video')}
+                className="flex-1 py-2 px-3 rounded-2xl bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 text-white font-bold text-xs flex items-center justify-center gap-2 transition active:scale-95 cursor-pointer shadow-md shadow-rose-950/40 border border-white/30"
+                title={`Video Call with ${partnerUser.name}`}
+              >
+                <Video className="w-3.5 h-3.5" />
+                <span>Video Call</span>
+              </button>
+            </div>
+
             {/* Bottom Distance & GPS Pill */}
             <div className="mt-3 pt-2.5 border-t border-white/15 flex items-center justify-between text-xs">
               <button
@@ -318,7 +343,43 @@ export const HomeDashboard: React.FC = () => {
               </div>
             </button>
 
-            {/* 2. Live Location */}
+            {/* 2. Video Call */}
+            <button
+              type="button"
+              onClick={() => startCall('video')}
+              className="p-3.5 rounded-2xl bg-gradient-to-br from-rose-50/90 via-pink-50/60 to-white hover:from-rose-100/90 border border-rose-200/90 shadow-2xs text-left transition tap-bounce group cursor-pointer flex flex-col justify-between min-h-[74px]"
+            >
+              <div className="flex items-center justify-between">
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-rose-500 to-pink-500 text-white flex items-center justify-center group-hover:scale-110 transition shadow-xs shadow-rose-500/30">
+                  <Video className="w-4 h-4" />
+                </div>
+                <span className="text-[10px] font-bold text-rose-700 bg-rose-100/80 px-1.5 py-0.5 rounded-md">Live HD</span>
+              </div>
+              <div>
+                <div className="font-extrabold text-xs text-slate-800">Video Call</div>
+                <div className="text-[10px] text-rose-600 font-semibold truncate">Phone & Laptop</div>
+              </div>
+            </button>
+
+            {/* 3. Voice Call */}
+            <button
+              type="button"
+              onClick={() => startCall('voice')}
+              className="p-3.5 rounded-2xl bg-white hover:bg-rose-50/50 border border-rose-100 shadow-2xs text-left transition tap-bounce group cursor-pointer flex flex-col justify-between min-h-[74px]"
+            >
+              <div className="flex items-center justify-between">
+                <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center group-hover:scale-110 transition border border-rose-200/60">
+                  <Phone className="w-4 h-4" />
+                </div>
+                <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded-md">Voice</span>
+              </div>
+              <div>
+                <div className="font-extrabold text-xs text-slate-800">Voice Call</div>
+                <div className="text-[10px] text-slate-400 truncate">Clear audio stream</div>
+              </div>
+            </button>
+
+            {/* 4. Live Location */}
             <button
               type="button"
               onClick={() => setShowLocationDialog(true)}

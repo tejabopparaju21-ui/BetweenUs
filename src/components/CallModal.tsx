@@ -526,7 +526,7 @@ export const CallModal: React.FC = () => {
   };
 
   // Toggle Mute Mic
-  const handleToggleMute = () => {
+  const handleToggleMute = useCallback(() => {
     if (localStreamRef.current) {
       localStreamRef.current.getAudioTracks().forEach((track) => {
         track.enabled = !track.enabled;
@@ -535,7 +535,25 @@ export const CallModal: React.FC = () => {
     } else {
       setIsMuted((prev) => !prev);
     }
-  };
+  }, []);
+
+  // Keyboard shortcuts for laptop / desktop users (M to mute/unmute, Escape to end/cancel call)
+  useEffect(() => {
+    if (!activeCall || activeCall.status === 'ended') return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) return;
+
+      if (e.key === 'm' || e.key === 'M') {
+        handleToggleMute();
+      } else if (e.key === 'Escape') {
+        endActiveCall();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeCall, endActiveCall, handleToggleMute]);
 
   // Toggle Video Track
   const handleToggleVideo = () => {
@@ -730,7 +748,7 @@ export const CallModal: React.FC = () => {
   // -------------------------------------------------------------
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-0 sm:p-4 select-none animate-in fade-in duration-200">
-      <div className="relative w-full h-full sm:max-w-md md:max-w-lg sm:h-[88vh] sm:max-h-[780px] bg-gradient-to-b from-slate-900 via-slate-950 to-black text-white sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden border border-rose-500/20">
+      <div className="relative w-full h-full sm:max-w-md md:max-w-xl lg:max-w-2xl sm:h-[88vh] sm:max-h-[820px] bg-gradient-to-b from-slate-900 via-slate-950 to-black text-white sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden border border-rose-500/20">
         {/* Floating Hearts Animation */}
         <div className="absolute inset-0 pointer-events-none z-30 overflow-hidden">
           {floatingHearts.map((heart) => (
