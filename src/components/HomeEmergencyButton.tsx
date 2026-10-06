@@ -17,6 +17,7 @@ export const HomeEmergencyButton: React.FC = () => {
   const {
     currentUser,
     partnerUser,
+    couple,
     triggerEmergencyAlert,
     activeEmergencyAlert,
   } = useApp();
@@ -24,6 +25,12 @@ export const HomeEmergencyButton: React.FC = () => {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [selectedMessage, setSelectedMessage] = useState('🚨 URGENT SOS! Please call or check on me immediately!');
   const [isTriggering, setIsTriggering] = useState(false);
+
+  const partnerPhone =
+    partnerUser.phoneNumber ||
+    (currentUser.id === couple?.partnerAId ? couple?.partnerBPhoneNumber : couple?.partnerAPhoneNumber) ||
+    partnerUser.emergencyContacts?.[0]?.phone ||
+    '';
 
   const presetMessages = [
     '🚨 URGENT SOS! Please call or check on me immediately!',
@@ -72,32 +79,43 @@ export const HomeEmergencyButton: React.FC = () => {
                 )}
               </div>
               <h3 className="text-base sm:text-lg font-black tracking-tight text-white mt-0.5">
-                Emergency SOS: Ring {partnerUser.name}
+                Emergency SOS: {partnerUser.name}
               </h3>
               <p className="text-xs text-rose-100/90 max-w-sm leading-relaxed mt-0.5">
-                Sounds a loud piercing siren &amp; vibrates {partnerUser.name}'s phone continuously, even in Silent or DND mode.
+                Call {partnerUser.name} directly on mobile or sound a loud piercing siren on their phone.
               </p>
               {/* Connected Phone Indicator */}
               <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-red-950/70 border border-red-300/30 text-[11px] font-mono font-bold text-rose-100">
                   <Phone className="w-3 h-3 text-emerald-400" />
-                  <span>{partnerUser.phoneNumber || partnerUser.emergencyContacts?.[0]?.phone || 'Phone not set'}</span>
+                  <span>{partnerPhone || 'Phone not set'}</span>
                 </span>
                 <span className="text-[10px] text-rose-200 font-semibold">
-                  {partnerUser.phoneNumber ? '• Connected Partner Ring' : '• Set in Profile'}
+                  {partnerPhone ? '• Emergency Phone Connected' : '• Set in Profile'}
                 </span>
               </div>
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setShowConfirmModal(true)}
-            className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-white text-red-700 hover:bg-rose-50 font-black text-xs sm:text-sm shadow-lg shadow-black/20 hover:shadow-xl transition-all duration-200 active:scale-95 flex items-center justify-center gap-2 shrink-0 cursor-pointer"
-          >
-            <Volume2 className="w-4 h-4 text-red-600 animate-bounce" />
-            <span>RING {partnerUser.name.toUpperCase()}'S PHONE</span>
-          </button>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto shrink-0">
+            {partnerPhone && (
+              <a
+                href={`tel:${partnerPhone}`}
+                className="px-4 py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-black text-xs sm:text-sm shadow-lg shadow-black/20 hover:shadow-xl transition-all duration-200 active:scale-95 flex items-center justify-center gap-2 text-center"
+              >
+                <PhoneCall className="w-4 h-4 animate-bounce" />
+                <span>CALL {partnerUser.name.toUpperCase()}</span>
+              </a>
+            )}
+            <button
+              type="button"
+              onClick={() => setShowConfirmModal(true)}
+              className="px-4 py-3 rounded-2xl bg-white text-red-700 hover:bg-rose-50 font-black text-xs sm:text-sm shadow-lg shadow-black/20 hover:shadow-xl transition-all duration-200 active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <Volume2 className="w-4 h-4 text-red-600" />
+              <span>SIREN &amp; SOS</span>
+            </button>
+          </div>
         </div>
       </div>
 

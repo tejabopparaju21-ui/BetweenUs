@@ -354,12 +354,6 @@ export const LiveLocationMap: React.FC<LiveLocationMapProps> = () => {
   const userTrailPolylineRef = useRef<L.Polyline | null>(null);
   const partnerTrailPolylineRef = useRef<L.Polyline | null>(null);
 
-  // Auto-start continuous GPS on mount so user never needs to click start
-  useEffect(() => {
-    if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
-      requestLocationPermission('current').catch(() => {});
-    }
-  }, [requestLocationPermission]);
 
   const handleToggleSharing = async () => {
     hasAutoCenteredRef.current = false;

@@ -1784,12 +1784,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     [couple, saveAndBroadcast]
   );
 
-  // 12. Location Sharing & Privacy for Both Partners
+  // 12. Location Sharing & Privacy for Both Partners (Battery-optimized, hardware-safe GPS watcher)
   const requestLocationPermission = useCallback(
     async (targetSlot: 'current' | 'userA' | 'userB' = 'current'): Promise<boolean> => {
-      setIsLocating(true);
-      setLocationError(null);
-
       // Determine target user from stable refs
       const curUserA = userARef.current;
       const curUserB = userBRef.current;
@@ -1805,17 +1802,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const targetUser = isTargetA ? curUserA : curUserB;
       const targetUserId = targetUser.uid || targetUser.id;
 
-      if (!('geolocation' in navigator)) {
+      if (typeof navigator === 'undefined' || !('geolocation' in navigator)) {
         setLocationError('Geolocation is not supported by your browser.');
         setIsLocating(false);
         return false;
       }
 
-      // Clear any prior watcher before starting
+      // CRITICAL: If GPS watcher is ALREADY active, do not tear down and restart!
+      // This prevents the GPS location symbol from flashing/thrashing on phone status bars.
       if (locationWatchIdRef.current !== null) {
-        navigator.geolocation.clearWatch(locationWatchIdRef.current);
-        locationWatchIdRef.current = null;
+        setIsLocating(false);
+        return true;
       }
+
+      setIsLocating(true);
+      setLocationError(null);
 
       return new Promise<boolean>((resolve) => {
         let hasResolved = false;
@@ -1826,13 +1827,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const accuracy = pos.coords.accuracy;
           const timestamp = pos.timestamp || Date.now();
 
-          // Distance and time throttling check
+          // Distance and time throttling check: only update if moved >= 25m or >= 30s elapsed
           const now = Date.now();
           const last = lastLocationUpdateRef.current;
           const latDiff = Math.abs(lat - last.lat) * 111320;
           const lngDiff = Math.abs(lng - last.lng) * 111320 * Math.cos((lat * Math.PI) / 180);
           const distMeters = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
           const shouldSyncCloud = now - last.time >= 30000 || distMeters >= 25 || last.time === 0;
+
+          // If stationary and within 30 seconds, discard redundant hardware callback to protect battery & avoid state re-render loops
+          if (!shouldSyncCloud && last.time !== 0) {
+            setIsLocating(false);
+            if (!hasResolved) {
+              hasResolved = true;
+              resolve(true);
+            }
+            return;
+          }
+
+          lastLocationUpdateRef.current = { lat, lng, time: now };
 
           // Optional Geoapify reverse geocoding only when significant movement or initial
           let addressName: string | null = null;
@@ -1858,76 +1871,61 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           };
 
           if (isTargetA) {
-            setUserA((prevA) => {
-              const updated = {
-                ...prevA,
-                shareLocation: true,
-                city: cleanCityName,
-                location: newLocation,
-              };
-              saveAndBroadcast({ userA: updated });
-              return updated;
+            setUserA((prevA) => ({
+              ...prevA,
+              shareLocation: true,
+              city: cleanCityName,
+              location: newLocation,
+            }));
+            syncUserToFirestore({
+              ...curUserA,
+              shareLocation: true,
+              city: cleanCityName,
+              location: newLocation,
             });
-            if (shouldSyncCloud) {
-              syncUserToFirestore({
-                ...curUserA,
-                shareLocation: true,
-                city: cleanCityName,
-                location: newLocation,
-              });
-              if (coupleRef.current) {
-                syncPartnerLocationToFirestore(
-                  coupleRef.current.id,
-                  'partnerA',
-                  newLocation,
-                  true,
-                  cleanCityName
-                );
-              }
+            if (coupleRef.current) {
+              syncPartnerLocationToFirestore(
+                coupleRef.current.id,
+                'partnerA',
+                newLocation,
+                true,
+                cleanCityName
+              );
             }
           } else {
-            setUserB((prevB) => {
-              const updated = {
-                ...prevB,
-                shareLocation: true,
-                city: cleanCityName,
-                location: newLocation,
-              };
-              saveAndBroadcast({ userB: updated });
-              return updated;
+            setUserB((prevB) => ({
+              ...prevB,
+              shareLocation: true,
+              city: cleanCityName,
+              location: newLocation,
+            }));
+            syncUserToFirestore({
+              ...curUserB,
+              shareLocation: true,
+              city: cleanCityName,
+              location: newLocation,
             });
-            if (shouldSyncCloud) {
-              syncUserToFirestore({
-                ...curUserB,
-                shareLocation: true,
-                city: cleanCityName,
-                location: newLocation,
-              });
-              if (coupleRef.current) {
-                syncPartnerLocationToFirestore(
-                  coupleRef.current.id,
-                  'partnerB',
-                  newLocation,
-                  true,
-                  cleanCityName
-                );
-              }
+            if (coupleRef.current) {
+              syncPartnerLocationToFirestore(
+                coupleRef.current.id,
+                'partnerB',
+                newLocation,
+                true,
+                cleanCityName
+              );
             }
           }
 
-          if (shouldSyncCloud) {
-            lastLocationUpdateRef.current = { lat, lng, time: now };
-            // Save to Firebase Realtime Database at locations/{userId}
-            await saveLiveLocationToRTDB(targetUserId, {
-              latitude: lat,
-              longitude: lng,
-              accuracy: accuracy ? Math.round(accuracy) : 0,
-              timestamp,
-              sharing: true,
-              displayName: targetUser.name,
-              address: cityDisplayName,
-            });
-          }
+          // Save to Firebase Realtime Database at locations/{userId}
+          await saveLiveLocationToRTDB(targetUserId, {
+            latitude: lat,
+            longitude: lng,
+            accuracy: accuracy ? Math.round(accuracy) : 0,
+            timestamp,
+            sharing: true,
+            displayName: targetUser.name,
+            address: cityDisplayName,
+          });
 
           setIsLocating(false);
           setLocationError(null);
@@ -1963,8 +1961,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             handleError,
             {
               enableHighAccuracy: true,
-              maximumAge: 10000,
-              timeout: 15000,
+              maximumAge: 30000, // 30-second cache prevents GPS chip from turning on and off constantly
+              timeout: 20000,
             }
           );
         } catch (watchErr: any) {
@@ -1977,14 +1975,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       });
     },
-    [saveAndBroadcast]
+    []
   );
 
-  // Activate live continuous GPS tracking safely without infinite loop
+  // Activate live continuous GPS tracking safely once on mount if user has location sharing enabled
   useEffect(() => {
     if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
       const activeUser = activeUserIdRef.current === userARef.current.id ? userARef.current : userBRef.current;
-      if (activeUser?.shareLocation) {
+      if (activeUser?.shareLocation && locationWatchIdRef.current === null) {
         requestLocationPermission('current').catch((err) => {
           console.warn('Auto GPS continuous tracking notice:', err);
         });

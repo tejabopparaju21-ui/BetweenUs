@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { EmergencyModal } from './EmergencyModal';
 import { PWAInstallButton } from './PWAInstallButton';
@@ -43,6 +43,12 @@ export const Navigation: React.FC = () => {
   const [showUserSwitcher, setShowUserSwitcher] = useState(false);
   const [showDownloadModal, setShowDownloadModal] = useState(false);
   const { isInstalled } = usePWAInstall();
+
+  useEffect(() => {
+    const handleOpenEmergency = () => setIsEmergencyOpen(true);
+    window.addEventListener('open_emergency_modal', handleOpenEmergency);
+    return () => window.removeEventListener('open_emergency_modal', handleOpenEmergency);
+  }, []);
 
   const unreadNotifsCount = notifications.filter((n) => !n.isRead).length;
 

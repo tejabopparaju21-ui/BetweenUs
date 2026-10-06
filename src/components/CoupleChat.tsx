@@ -29,6 +29,7 @@ import {
   PhoneCall,
   MoreVertical,
   HeartHandshake,
+  ShieldAlert,
 } from 'lucide-react';
 import { readFileAsDataUrl } from '../utils/fileUtils';
 import { isPartnerSleeping } from '../utils/distance';
@@ -79,6 +80,12 @@ export const CoupleChat: React.FC = () => {
 
   // In-Chat Voice & Video Call State
   const [showChatOptionsMenu, setShowChatOptionsMenu] = useState(false);
+
+  const partnerPhone =
+    partnerUser.phoneNumber ||
+    (currentUser.id === couple?.partnerAId ? couple?.partnerBPhoneNumber : couple?.partnerAPhoneNumber) ||
+    partnerUser.emergencyContacts?.[0]?.phone ||
+    '';
 
   const handleStartCall = (mode: 'voice' | 'video') => {
     startCall(mode);
@@ -435,6 +442,28 @@ export const CoupleChat: React.FC = () => {
                   <Video className="w-3.5 h-3.5 text-rose-500" />
                   <span>Start Video Call</span>
                 </button>
+                {partnerPhone && (
+                  <a
+                    href={`tel:${partnerPhone}`}
+                    onClick={() => setShowChatOptionsMenu(false)}
+                    className="w-full px-3.5 py-2 text-left text-xs font-semibold text-emerald-700 hover:bg-emerald-50 flex items-center gap-2 transition cursor-pointer"
+                  >
+                    <PhoneCall className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Call Mobile ({partnerPhone})</span>
+                  </a>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowChatOptionsMenu(false);
+                    window.dispatchEvent(new CustomEvent('open_emergency_modal'));
+                  }}
+                  className="w-full px-3.5 py-2 text-left text-xs font-semibold text-red-600 hover:bg-red-50 flex items-center gap-2 transition cursor-pointer"
+                >
+                  <ShieldAlert className="w-3.5 h-3.5 text-red-500" />
+                  <span>Emergency SOS / Siren</span>
+                </button>
+                <div className="h-px bg-slate-100 my-1" />
                 <button
                   type="button"
                   onClick={() => {

@@ -66,6 +66,8 @@ export interface Couple {
   partnerBShareLocation?: boolean;
   partnerACity?: string;
   partnerBCity?: string;
+  partnerAPhoneNumber?: string;
+  partnerBPhoneNumber?: string;
   // Real-time active call session between the couple
   activeCall?: CallSession | null;
 }
