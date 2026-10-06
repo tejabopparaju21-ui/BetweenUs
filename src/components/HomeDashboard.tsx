@@ -53,6 +53,7 @@ export const HomeDashboard: React.FC = () => {
     requestLocationPermission,
     startCall,
     isPartnerPaired,
+    pairWithPartnerCode,
     firebaseUser,
   } = useApp();
 
@@ -64,6 +65,11 @@ export const HomeDashboard: React.FC = () => {
   const [peekWallpaper, setPeekWallpaper] = useState(false);
   const [dismissPairingCard, setDismissPairingCard] = useState(false);
   const [copiedMyCode, setCopiedMyCode] = useState(false);
+  const [partnerCodeInput, setPartnerCodeInput] = useState('');
+  const [isLinkingCode, setIsLinkingCode] = useState(false);
+  const [linkCodeMessage, setLinkCodeMessage] = useState<string | null>(null);
+  const [linkCodeSuccess, setLinkCodeSuccess] = useState(false);
+  const [manualShowPairing, setManualShowPairing] = useState(false);
 
   const handleCopyCode = async () => {
     const code = couple?.code || currentUser.coupleCode || 'PAIR-CODE';
@@ -80,6 +86,38 @@ export const HomeDashboard: React.FC = () => {
     const message = `Hey my love! ❤️ Join me on BetweenUs so we can chat and track our space.\n\nOur private couple code: ${code}\n\nOpen BetweenUs here: ${appUrl}`;
     const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, '_blank');
+  };
+
+  const handleDirectLinkCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const clean = partnerCodeInput.trim().toUpperCase();
+    if (!clean) {
+      setLinkCodeMessage('Please enter your partner\'s couple code.');
+      setLinkCodeSuccess(false);
+      return;
+    }
+    const myCode = (couple?.code || currentUser.coupleCode || '').toUpperCase();
+    if (clean === myCode) {
+      setLinkCodeMessage('That is your own code! Enter your partner\'s code to link with them.');
+      setLinkCodeSuccess(false);
+      return;
+    }
+
+    setIsLinkingCode(true);
+    setLinkCodeMessage('Connecting with your partner in cloud...');
+    try {
+      const res = await pairWithPartnerCode(clean);
+      setLinkCodeMessage(res.message);
+      setLinkCodeSuccess(res.success);
+      if (res.success) {
+        setPartnerCodeInput('');
+      }
+    } catch (err: any) {
+      setLinkCodeMessage(err?.message || 'Failed to connect. Please verify the code.');
+      setLinkCodeSuccess(false);
+    } finally {
+      setIsLinkingCode(false);
+    }
   };
 
   // Update clock every second for live IST timing
@@ -211,55 +249,115 @@ export const HomeDashboard: React.FC = () => {
 
       {/* Main Home Dashboard Cards with Smooth Peek Transition */}
       <div className={`space-y-4 sm:space-y-5 transition-all duration-300 ${peekWallpaper ? 'opacity-0 pointer-events-none scale-95' : 'opacity-100 scale-100'}`}>
-        {/* Waiting for partner pairing card - non-blocking & informative */}
-        {!isPartnerPaired && firebaseUser && !dismissPairingCard && (
-          <div className="bg-gradient-to-r from-rose-500 via-pink-500 to-rose-600 rounded-[22px] p-4 text-white shadow-lg shadow-rose-950/20 border border-white/25 relative overflow-hidden animate-in fade-in">
+        {/* Waiting for partner pairing card - WITH DIRECT CODE INPUT FIELD */}
+        {((!isPartnerPaired || couple?.status === 'waiting_for_partner' || manualShowPairing) && !dismissPairingCard) ? (
+          <div className="bg-gradient-to-br from-rose-500 via-pink-500 to-rose-600 rounded-[24px] p-4 sm:p-5 text-white shadow-xl shadow-rose-950/20 border border-white/30 relative overflow-hidden animate-in fade-in">
             <div className="flex items-center justify-between pb-2 border-b border-white/20 mb-3">
               <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-amber-300 animate-ping" />
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-300 animate-ping" />
                 <span className="text-xs font-black uppercase tracking-wider text-rose-100">
-                  Waiting for Partner to Connect
+                  {isPartnerPaired ? 'Couple Link Space' : 'Waiting for Partner to Connect'}
                 </span>
               </div>
               <button
                 type="button"
                 onClick={() => setDismissPairingCard(true)}
-                className="text-white/70 hover:text-white text-xs p-1 cursor-pointer"
-                title="Dismiss banner"
+                className="text-white/80 hover:text-white text-xs px-2 py-0.5 rounded-lg hover:bg-white/10 transition cursor-pointer"
+                title="Minimize banner"
               >
-                ✕
+                ✕ Minimize
               </button>
             </div>
+
             <p className="text-xs text-rose-100 mb-3 leading-relaxed">
-              Share your private code with your partner or enter their code to link both your phones.
+              BetweenUs is an exclusive private sanctuary for just the two of you. Use either person&apos;s code to connect!
             </p>
-            <div className="bg-white/20 backdrop-blur-md rounded-2xl p-2.5 flex items-center justify-between gap-2 border border-white/30 mb-3">
-              <span className="text-sm sm:text-base font-mono font-black tracking-widest pl-2 select-all">
-                {couple?.code || currentUser.coupleCode || 'PAIR-CODE'}
-              </span>
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={handleCopyCode}
-                  className="px-2.5 py-1 bg-white text-rose-600 rounded-xl text-xs font-bold shadow-xs hover:bg-rose-50 transition active:scale-95 cursor-pointer"
-                >
-                  {copiedMyCode ? 'Copied!' : 'Copy'}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleShareWhatsApp}
-                  className="px-2.5 py-1 bg-emerald-600 text-white rounded-xl text-xs font-bold shadow-xs hover:bg-emerald-700 transition active:scale-95 cursor-pointer"
-                >
-                  WhatsApp
-                </button>
+
+            {/* Option 1: Your Code */}
+            <div className="bg-white/15 backdrop-blur-md rounded-2xl p-3 border border-white/25 mb-3.5">
+              <div className="flex items-center justify-between text-[11px] font-bold text-rose-100 uppercase tracking-wider mb-1.5">
+                <span>Option 1: Share Your Code</span>
+                <span className="text-[10px] text-white/80 lowercase">your code</span>
               </div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-base sm:text-lg font-mono font-black tracking-widest pl-1 select-all text-white drop-shadow-xs">
+                  {couple?.code || currentUser.coupleCode || 'PAIR-CODE'}
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={handleCopyCode}
+                    className="px-3 py-1.5 bg-white text-rose-600 rounded-xl text-xs font-bold shadow-xs hover:bg-rose-50 transition active:scale-95 cursor-pointer"
+                  >
+                    {copiedMyCode ? 'Copied!' : 'Copy'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleShareWhatsApp}
+                    className="px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-xs font-bold shadow-xs hover:bg-emerald-700 transition active:scale-95 cursor-pointer"
+                  >
+                    WhatsApp
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Option 2: Enter Partner's Code (DIRECT TEXT INPUT FIELD) */}
+            <div className="bg-white/15 backdrop-blur-md rounded-2xl p-3 border border-white/25">
+              <div className="flex items-center justify-between text-[11px] font-bold text-rose-100 uppercase tracking-wider mb-2">
+                <span>Option 2: Enter Partner&apos;s Code</span>
+                <span className="text-[10px] text-emerald-200 font-bold">link instantly</span>
+              </div>
+              <form onSubmit={handleDirectLinkCode} className="space-y-2">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={partnerCodeInput}
+                    onChange={(e) => setPartnerCodeInput(e.target.value.toUpperCase())}
+                    placeholder="E.G. PAIR-7K9A"
+                    className="flex-1 min-w-0 bg-white text-slate-900 placeholder-slate-400 font-mono font-black text-xs uppercase px-3 py-2.5 rounded-xl border border-white/40 focus:outline-none focus:ring-2 focus:ring-rose-300 tracking-wider shadow-inner"
+                  />
+                  <button
+                    type="submit"
+                    disabled={isLinkingCode || !partnerCodeInput.trim()}
+                    className="px-4 py-2.5 bg-slate-950 hover:bg-black active:scale-95 text-white font-extrabold text-xs rounded-xl shadow-md transition disabled:opacity-50 shrink-0 cursor-pointer flex items-center gap-1"
+                  >
+                    <span>{isLinkingCode ? 'Linking...' : 'Link & Begin ❤️'}</span>
+                  </button>
+                </div>
+              </form>
+
+              {linkCodeMessage && (
+                <div
+                  className={`mt-2.5 p-2.5 rounded-xl text-xs font-bold text-center animate-in fade-in ${
+                    linkCodeSuccess
+                      ? 'bg-emerald-500/40 text-emerald-100 border border-emerald-300/40'
+                      : 'bg-rose-950/60 text-rose-200 border border-rose-400/30'
+                  }`}
+                >
+                  {linkCodeMessage}
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          /* Minimized pill if dismissed or already paired so user can always access it with 1 click */
+          <div className="flex items-center justify-between bg-white/80 backdrop-blur-md px-3.5 py-2 rounded-2xl border border-rose-200/60 shadow-2xs">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+              <span className="text-xs font-bold text-slate-800 truncate">
+                Couple Code: <span className="font-mono text-rose-600 font-black">{couple?.code || currentUser.coupleCode || 'PAIR-CODE'}</span>
+              </span>
             </div>
             <button
               type="button"
-              onClick={() => window.dispatchEvent(new CustomEvent('open_pairing_modal'))}
-              className="w-full py-2 bg-white/25 hover:bg-white/35 active:scale-98 rounded-xl text-xs font-extrabold text-white text-center transition border border-white/30 cursor-pointer"
+              onClick={() => {
+                setDismissPairingCard(false);
+                setManualShowPairing(true);
+              }}
+              className="text-xs font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-3 py-1 rounded-xl transition cursor-pointer shrink-0 active:scale-95"
             >
-              Enter Partner&apos;s Code & Link Accounts ➔
+              Enter Code ➔
             </button>
           </div>
         )}

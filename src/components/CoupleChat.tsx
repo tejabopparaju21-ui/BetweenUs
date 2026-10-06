@@ -28,6 +28,7 @@ import {
   PhoneOff,
   PhoneCall,
   MoreVertical,
+  HeartHandshake,
 } from 'lucide-react';
 import { readFileAsDataUrl } from '../utils/fileUtils';
 import { isPartnerSleeping } from '../utils/distance';
@@ -434,6 +435,17 @@ export const CoupleChat: React.FC = () => {
                   <Video className="w-3.5 h-3.5 text-rose-500" />
                   <span>Start Video Call</span>
                 </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowChatOptionsMenu(false);
+                    window.dispatchEvent(new CustomEvent('open_pairing_modal'));
+                  }}
+                  className="w-full px-3.5 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-rose-50 hover:text-rose-600 flex items-center gap-2 transition cursor-pointer"
+                >
+                  <HeartHandshake className="w-3.5 h-3.5 text-rose-500" />
+                  <span>Enter / View Couple Code</span>
+                </button>
                 <div className="h-px bg-slate-100 my-1" />
                 <button
                   type="button"
@@ -488,9 +500,17 @@ export const CoupleChat: React.FC = () => {
           </span>
         </div>
 
-        {/* Partner Connection Label */}
+        {/* Partner Connection & Couple Code Quick Link */}
         <div className="flex items-center gap-1.5 text-[11px] text-slate-500 font-medium">
-          <span>With</span>
+          <button
+            type="button"
+            onClick={() => window.dispatchEvent(new CustomEvent('open_pairing_modal'))}
+            className="flex items-center gap-1 text-[10px] font-bold text-rose-600 bg-white hover:bg-rose-50 px-2 py-0.5 rounded-lg border border-rose-200 shadow-2xs transition active:scale-95 cursor-pointer"
+            title="View or Enter Couple Code"
+          >
+            <span>🔗 {couple?.code || currentUser.coupleCode || 'PAIR CODE'}</span>
+          </button>
+          <span className="hidden xs:inline">With</span>
           <span className="font-extrabold text-rose-600 bg-white px-2 py-0.5 rounded-lg border border-rose-200/60 shadow-2xs">
             {partnerUser.name}
           </span>

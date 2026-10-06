@@ -101,6 +101,17 @@ export const Navigation: React.FC = () => {
                 <Video className="w-3.5 h-3.5" />
               </button>
             </div>
+
+            {/* Couple Code Button / Link Partner Modal Trigger */}
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent('open_pairing_modal'))}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-gradient-to-r from-rose-50 to-pink-50 hover:from-rose-100 hover:to-pink-100 border border-rose-200 text-xs font-bold text-rose-700 transition active:scale-95 shadow-2xs cursor-pointer"
+              title="View your Couple Code or Link Partner"
+            >
+              <HeartHandshake className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+              <span className="font-mono text-[11px] font-black">{couple?.code || currentUser.coupleCode || 'PAIR CODE'}</span>
+            </button>
             {/* Quick Multi-Partner Switcher pill/avatar */}
             <button
               onClick={() => setShowUserSwitcher(!showUserSwitcher)}

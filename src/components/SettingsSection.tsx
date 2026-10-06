@@ -1210,22 +1210,67 @@ export const SettingsSection: React.FC = () => {
               )}
             </div>
 
-            {/* Direct Partner Pairing Button */}
-            {firebaseUser && (
-              <div className="p-3.5 rounded-2xl bg-rose-50/60 border border-rose-100 flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <span className="text-xs font-bold text-slate-800 block truncate">Partner Pairing Space</span>
-                  <span className="text-[11px] text-slate-500 font-mono">Code: {couple?.code || currentUser.coupleCode || 'PAIR-CODE'}</span>
+            {/* Direct Partner Pairing & Enter Code Section */}
+            <div className="p-4 rounded-2xl bg-gradient-to-br from-rose-50 to-pink-50 border border-rose-200/80 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-bold text-slate-800 block">💑 Couple Code & Partner Link</span>
+                  <span className="text-[11px] text-slate-500 font-mono">Your Code: <strong className="text-rose-600">{couple?.code || currentUser.coupleCode || 'PAIR-CODE'}</strong></span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => window.dispatchEvent(new CustomEvent('open_pairing_modal'))}
-                  className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-2xs transition active:scale-95 cursor-pointer shrink-0"
-                >
-                  Pairing View
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={handleCopyCode}
+                    className="px-2.5 py-1 bg-white hover:bg-rose-50 border border-rose-200 text-rose-600 rounded-lg text-xs font-bold transition active:scale-95 cursor-pointer"
+                  >
+                    {copiedCode ? 'Copied!' : 'Copy'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleShareWhatsApp}
+                    className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition active:scale-95 cursor-pointer"
+                  >
+                    WhatsApp
+                  </button>
+                </div>
               </div>
-            )}
+
+              {/* Direct Code Input Form */}
+              <form onSubmit={handleConnectCode} className="space-y-2 pt-1 border-t border-rose-200/50">
+                <label className="text-[11px] font-bold text-slate-700 block">
+                  Enter Partner&apos;s Couple Code to Link:
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={enterCode}
+                    onChange={(e) => setEnterCode(e.target.value.toUpperCase())}
+                    placeholder="E.G. PAIR-7K9A"
+                    className="flex-1 bg-white text-slate-800 placeholder-slate-400 font-mono font-bold text-xs uppercase px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-rose-400 tracking-wider shadow-inner"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!enterCode.trim()}
+                    className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-bold text-xs rounded-xl shadow-xs transition disabled:opacity-50 cursor-pointer"
+                  >
+                    Link Accounts
+                  </button>
+                </div>
+                {codeMessage && (
+                  <p className="text-xs font-semibold text-rose-700 bg-white/70 p-2 rounded-lg border border-rose-200">
+                    {codeMessage}
+                  </p>
+                )}
+              </form>
+
+              <button
+                type="button"
+                onClick={() => window.dispatchEvent(new CustomEvent('open_pairing_modal'))}
+                className="w-full text-center text-[11px] font-bold text-rose-600 hover:underline pt-1 cursor-pointer"
+              >
+                Open Fullscreen Pairing View ➔
+              </button>
+            </div>
 
             {/* Auth Form if not signed in */}
             {!firebaseUser && (
