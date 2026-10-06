@@ -20,19 +20,26 @@ import { CouplePairingView } from './components/CouplePairingView';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 function MainAppContent() {
-  const { activeTab, firebaseUser, isDemoMode, isPartnerPaired, exitDemoMode } = useApp();
+  const { activeTab, firebaseUser, isDemoMode, exitDemoMode } = useApp();
+  const [showPairingModal, setShowPairingModal] = React.useState(false);
+
+  React.useEffect(() => {
+    const handleOpenPairing = () => setShowPairingModal(true);
+    window.addEventListener('open_pairing_modal', handleOpenPairing);
+    return () => window.removeEventListener('open_pairing_modal', handleOpenPairing);
+  }, []);
 
   // 1. Unauthenticated and not in Demo Mode -> Display AuthScreen
   if (!firebaseUser && !isDemoMode) {
     return <AuthScreen />;
   }
 
-  // 2. Authenticated with Google/Email, but haven't linked with partner yet -> Display CouplePairingView
-  if (firebaseUser && !isDemoMode && !isPartnerPaired) {
-    return <CouplePairingView />;
+  // 2. If user explicitly opens pairing view -> Display CouplePairingView with back/close option
+  if (showPairingModal) {
+    return <CouplePairingView onClose={() => setShowPairingModal(false)} />;
   }
 
-  // 3. Either paired with partner or exploring in Demo Mode -> Display Main App
+  // 3. Once authenticated (or in Demo Mode) -> Directly allow entry to the website!
   return (
     <div
       className={`min-h-screen flex flex-col relative transition-colors duration-500 ${

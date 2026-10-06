@@ -1210,6 +1210,23 @@ export const SettingsSection: React.FC = () => {
               )}
             </div>
 
+            {/* Direct Partner Pairing Button */}
+            {firebaseUser && (
+              <div className="p-3.5 rounded-2xl bg-rose-50/60 border border-rose-100 flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <span className="text-xs font-bold text-slate-800 block truncate">Partner Pairing Space</span>
+                  <span className="text-[11px] text-slate-500 font-mono">Code: {couple?.code || currentUser.coupleCode || 'PAIR-CODE'}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => window.dispatchEvent(new CustomEvent('open_pairing_modal'))}
+                  className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-2xs transition active:scale-95 cursor-pointer shrink-0"
+                >
+                  Pairing View
+                </button>
+              </div>
+            )}
+
             {/* Auth Form if not signed in */}
             {!firebaseUser && (
               <div className="p-3.5 rounded-2xl bg-rose-50/50 border border-rose-100 space-y-3">

@@ -52,6 +52,8 @@ export const HomeDashboard: React.FC = () => {
     quickLoveBurst,
     requestLocationPermission,
     startCall,
+    isPartnerPaired,
+    firebaseUser,
   } = useApp();
 
   const [currentTimeTick, setCurrentTimeTick] = useState(Date.now());
@@ -60,6 +62,25 @@ export const HomeDashboard: React.FC = () => {
   const [selectedMoodType, setSelectedMoodType] = useState<MoodType>('loved');
   const [showLocationDialog, setShowLocationDialog] = useState(false);
   const [peekWallpaper, setPeekWallpaper] = useState(false);
+  const [dismissPairingCard, setDismissPairingCard] = useState(false);
+  const [copiedMyCode, setCopiedMyCode] = useState(false);
+
+  const handleCopyCode = async () => {
+    const code = couple?.code || currentUser.coupleCode || 'PAIR-CODE';
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopiedMyCode(true);
+      setTimeout(() => setCopiedMyCode(false), 2500);
+    } catch (e) {}
+  };
+
+  const handleShareWhatsApp = () => {
+    const code = couple?.code || currentUser.coupleCode || 'PAIR-CODE';
+    const appUrl = window.location.origin;
+    const message = `Hey my love! ❤️ Join me on BetweenUs so we can chat and track our space.\n\nOur private couple code: ${code}\n\nOpen BetweenUs here: ${appUrl}`;
+    const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`;
+    window.open(whatsappUrl, '_blank');
+  };
 
   // Update clock every second for live IST timing
   useEffect(() => {
@@ -190,6 +211,59 @@ export const HomeDashboard: React.FC = () => {
 
       {/* Main Home Dashboard Cards with Smooth Peek Transition */}
       <div className={`space-y-4 sm:space-y-5 transition-all duration-300 ${peekWallpaper ? 'opacity-0 pointer-events-none scale-95' : 'opacity-100 scale-100'}`}>
+        {/* Waiting for partner pairing card - non-blocking & informative */}
+        {!isPartnerPaired && firebaseUser && !dismissPairingCard && (
+          <div className="bg-gradient-to-r from-rose-500 via-pink-500 to-rose-600 rounded-[22px] p-4 text-white shadow-lg shadow-rose-950/20 border border-white/25 relative overflow-hidden animate-in fade-in">
+            <div className="flex items-center justify-between pb-2 border-b border-white/20 mb-3">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-amber-300 animate-ping" />
+                <span className="text-xs font-black uppercase tracking-wider text-rose-100">
+                  Waiting for Partner to Connect
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDismissPairingCard(true)}
+                className="text-white/70 hover:text-white text-xs p-1 cursor-pointer"
+                title="Dismiss banner"
+              >
+                ✕
+              </button>
+            </div>
+            <p className="text-xs text-rose-100 mb-3 leading-relaxed">
+              Share your private code with your partner or enter their code to link both your phones.
+            </p>
+            <div className="bg-white/20 backdrop-blur-md rounded-2xl p-2.5 flex items-center justify-between gap-2 border border-white/30 mb-3">
+              <span className="text-sm sm:text-base font-mono font-black tracking-widest pl-2 select-all">
+                {couple?.code || currentUser.coupleCode || 'PAIR-CODE'}
+              </span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={handleCopyCode}
+                  className="px-2.5 py-1 bg-white text-rose-600 rounded-xl text-xs font-bold shadow-xs hover:bg-rose-50 transition active:scale-95 cursor-pointer"
+                >
+                  {copiedMyCode ? 'Copied!' : 'Copy'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleShareWhatsApp}
+                  className="px-2.5 py-1 bg-emerald-600 text-white rounded-xl text-xs font-bold shadow-xs hover:bg-emerald-700 transition active:scale-95 cursor-pointer"
+                >
+                  WhatsApp
+                </button>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent('open_pairing_modal'))}
+              className="w-full py-2 bg-white/25 hover:bg-white/35 active:scale-98 rounded-xl text-xs font-extrabold text-white text-center transition border border-white/30 cursor-pointer"
+            >
+              Enter Partner&apos;s Code & Link Accounts ➔
+            </button>
+          </div>
+        )}
+
         {/* Couple Connection Centerpiece Card - Sleek, Romantic, Mobile-Optimized */}
         <div className="relative overflow-hidden rounded-[24px] p-4 sm:p-5 text-white shadow-xl shadow-rose-950/20 border border-white/30 backdrop-blur-xl">
           {/* Holding hands backdrop image with romantic rose tint */}

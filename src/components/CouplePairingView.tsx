@@ -2,7 +2,11 @@ import React, { useState } from 'react';
 import { Heart, Copy, Check, Share2, Sparkles, LogOut, ArrowRight, AlertCircle, Link2, Loader2, Users } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
-export const CouplePairingView: React.FC = () => {
+interface CouplePairingViewProps {
+  onClose?: () => void;
+}
+
+export const CouplePairingView: React.FC<CouplePairingViewProps> = ({ onClose }) => {
   const { currentUser, couple, pairWithPartnerCode, logOutFirebase, enterDemoMode } = useApp();
   const [partnerCodeInput, setPartnerCodeInput] = useState('');
   const [copied, setCopied] = useState(false);
@@ -65,6 +69,11 @@ export const CouplePairingView: React.FC = () => {
         setLinkError(res.message || 'Could not link with this code. Please verify and try again.');
       } else {
         setLinkSuccess(res.message);
+        if (onClose) {
+          setTimeout(() => {
+            onClose();
+          }, 1200);
+        }
       }
     } catch (err: any) {
       setLinkError(err?.message || 'Error linking accounts. Please try again.');
@@ -100,14 +109,25 @@ export const CouplePairingView: React.FC = () => {
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={logOutFirebase}
-          className="flex items-center gap-1 text-[11px] font-semibold text-slate-500 hover:text-red-600 bg-white hover:bg-red-50 border border-slate-200 hover:border-red-200 px-3 py-1.5 rounded-xl transition cursor-pointer"
-        >
-          <LogOut className="w-3.5 h-3.5" />
-          <span>Sign Out</span>
-        </button>
+        <div className="flex items-center gap-2">
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex items-center gap-1 text-[11px] font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-3 py-1.5 rounded-xl transition cursor-pointer active:scale-95"
+            >
+              <span>Continue to App ➔</span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={logOutFirebase}
+            className="flex items-center gap-1 text-[11px] font-semibold text-slate-500 hover:text-red-600 bg-white hover:bg-red-50 border border-slate-200 hover:border-red-200 px-3 py-1.5 rounded-xl transition cursor-pointer"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span>Sign Out</span>
+          </button>
+        </div>
       </header>
 
       {/* Main Pairing Workspace */}
@@ -244,7 +264,16 @@ export const CouplePairingView: React.FC = () => {
       </main>
 
       {/* Footer Info */}
-      <footer className="w-full max-w-md mx-auto text-center pb-2">
+      <footer className="w-full max-w-md mx-auto text-center pb-4 space-y-2.5">
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-full py-3.5 bg-gradient-to-r from-rose-500 via-pink-500 to-rose-600 hover:from-rose-600 hover:to-pink-600 text-white rounded-2xl font-bold text-xs shadow-md transition active:scale-98 cursor-pointer flex items-center justify-center gap-1.5"
+          >
+            <span>Enter BetweenUs Sanctuary ➔</span>
+          </button>
+        )}
         <button
           type="button"
           onClick={enterDemoMode}
