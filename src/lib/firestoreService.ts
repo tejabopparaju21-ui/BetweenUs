@@ -835,37 +835,65 @@ export function listenToCoupleMessages(
   }
 
   try {
-    const msgsQuery = query(
-      collection(db, 'couples', coupleId, 'messages'),
-      orderBy('createdAt', 'asc'),
-      limit(200)
-    );
+    const msgsColl = collection(db, 'couples', coupleId, 'messages');
+    let msgsQuery: any;
+    try {
+      msgsQuery = query(msgsColl, orderBy('createdAt', 'asc'), limit(250));
+    } catch {
+      msgsQuery = query(msgsColl, limit(250));
+    }
 
-    return onSnapshot(
+    let isFallbackActive = false;
+    let activeUnsub: (() => void) | null = null;
+
+    const parseAndEmit = (snapshot: any) => {
+      const list: ChatMessage[] = [];
+      snapshot.forEach((docSnap: any) => {
+        const data = docSnap.data() as any;
+        let createdAtStr = data.createdAt;
+        if (!createdAtStr && data.timestamp && typeof data.timestamp.toDate === 'function') {
+          createdAtStr = data.timestamp.toDate().toISOString();
+        }
+        list.push({
+          ...data,
+          id: docSnap.id,
+          status: data.status || 'sent',
+          readBy: data.readBy || [data.senderId],
+          createdAt: createdAtStr || new Date().toISOString(),
+        } as ChatMessage);
+      });
+      // Sort in memory to guarantee perfect chronological order
+      list.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      onUpdate(list);
+    };
+
+    activeUnsub = onSnapshot(
       msgsQuery,
-      (snapshot) => {
-        const list: ChatMessage[] = [];
-        snapshot.forEach((docSnap) => {
-          const data = docSnap.data() as any;
-          let createdAtStr = data.createdAt;
-          if (!createdAtStr && data.timestamp && typeof data.timestamp.toDate === 'function') {
-            createdAtStr = data.timestamp.toDate().toISOString();
-          }
-          list.push({
-            ...data,
-            id: docSnap.id,
-            status: data.status || 'sent',
-            readBy: data.readBy || [data.senderId],
-            createdAt: createdAtStr || new Date().toISOString(),
-          } as ChatMessage);
-        });
-        onUpdate(list);
-      },
+      parseAndEmit,
       (error) => {
         console.warn('Firestore messages snapshot listener notice:', error.message);
+        // Fallback to unindexed query if index is missing or building
+        if (!isFallbackActive && (error.code === 'failed-precondition' || error.message?.includes('index'))) {
+          isFallbackActive = true;
+          try {
+            if (activeUnsub) activeUnsub();
+            const fallbackQuery = query(msgsColl, limit(250));
+            activeUnsub = onSnapshot(fallbackQuery, parseAndEmit, (fallbackErr) => {
+              console.warn('Fallback messages listener notice:', fallbackErr.message);
+              if (onError) onError(fallbackErr);
+            });
+            return;
+          } catch (e) {
+            console.warn('Error setting up fallback listener:', e);
+          }
+        }
         if (onError) onError(error);
       }
     );
+
+    return () => {
+      if (activeUnsub) activeUnsub();
+    };
   } catch (err: any) {
     console.warn('Failed to set up messages listener:', err);
     if (onError) onError(err);
