@@ -33,6 +33,7 @@ import {
   RefreshCw,
   Phone,
   Video,
+  Bell,
 } from 'lucide-react';
 import { LiveLocationModal } from './LiveLocationModal';
 import { LiveLocationMap } from './LiveLocationMap';
@@ -55,6 +56,9 @@ export const HomeDashboard: React.FC = () => {
     isPartnerPaired,
     pairWithPartnerCode,
     firebaseUser,
+    notifications,
+    markNotificationRead,
+    clearAllNotifications,
   } = useApp();
 
   const [currentTimeTick, setCurrentTimeTick] = useState(Date.now());
@@ -72,6 +76,8 @@ export const HomeDashboard: React.FC = () => {
   const [manualShowPairing, setManualShowPairing] = useState(false);
 
   const [copiedInviteLink, setCopiedInviteLink] = useState(false);
+  const [showLoveAlerts, setShowLoveAlerts] = useState(false);
+  const unreadNotifsCount = notifications.filter((n) => !n.isRead).length;
 
   const handleCopyCode = async () => {
     const code = couple?.code || currentUser.coupleCode || 'PAIR-CODE';
@@ -237,7 +243,7 @@ export const HomeDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Top Mobile Couple Greeting & Wallpaper Peek Button */}
+      {/* Top Mobile Couple Greeting & Actions */}
       <div className="flex items-center justify-between px-1">
         <div>
           <h2 className="text-base sm:text-lg font-black text-slate-900 flex items-center gap-1.5">
@@ -259,19 +265,85 @@ export const HomeDashboard: React.FC = () => {
               : `Your private haven with ${partnerUser.name}`}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => setPeekWallpaper(!peekWallpaper)}
-          className="text-xs font-bold text-slate-700 bg-white/85 hover:bg-white backdrop-blur-md px-3 py-1.5 rounded-full border border-rose-100 shadow-2xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer shrink-0"
-          title="Toggle wallpaper view"
-        >
-          <Eye className="w-3.5 h-3.5 text-rose-500" />
-          <span className="hidden xs:inline">{peekWallpaper ? 'Dashboard' : 'Wallpaper'}</span>
-        </button>
+
+        <div className="flex items-center gap-1.5 shrink-0">
+          {/* Notifications / Love Alerts */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowLoveAlerts(!showLoveAlerts)}
+              className="w-8 h-8 rounded-full bg-white/85 hover:bg-white backdrop-blur-md border border-rose-100 shadow-2xs flex items-center justify-center text-slate-600 hover:text-rose-600 transition active:scale-95 cursor-pointer relative"
+              title="Love Alerts & Notifications"
+              aria-label="Love Alerts"
+            >
+              <Bell className="w-3.5 h-3.5" />
+              {unreadNotifsCount > 0 && (
+                <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white animate-pulse" />
+              )}
+            </button>
+
+            {/* Notification Dropdown */}
+            {showLoveAlerts && (
+              <div className="absolute right-0 top-full mt-2 w-80 max-w-[88vw] bg-white rounded-2xl shadow-xl border border-rose-100 p-3 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100 mb-2">
+                  <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <Bell className="w-3.5 h-3.5 text-rose-500" />
+                    <span>Love Alerts ({notifications.length})</span>
+                  </span>
+                  {notifications.length > 0 && (
+                    <button
+                      onClick={clearAllNotifications}
+                      className="text-[11px] text-rose-500 hover:underline cursor-pointer"
+                    >
+                      Clear all
+                    </button>
+                  )}
+                </div>
+                <div className="max-h-64 overflow-y-auto space-y-2">
+                  {notifications.length === 0 ? (
+                    <p className="text-xs text-slate-400 text-center py-4">No new notifications</p>
+                  ) : (
+                    notifications.map((n) => (
+                      <div
+                        key={n.id}
+                        onClick={() => markNotificationRead(n.id)}
+                        className={`p-2.5 rounded-xl text-left transition cursor-pointer text-xs ${
+                          n.isRead ? 'bg-slate-50 text-slate-500' : 'bg-rose-50/70 text-slate-800 font-medium'
+                        }`}
+                      >
+                        <div className="font-semibold text-rose-950 flex items-center justify-between">
+                          <span>{n.title}</span>
+                          {!n.isRead && (
+                            <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                          )}
+                        </div>
+                        <div className="text-slate-600 mt-0.5 line-clamp-2">{n.body}</div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Wallpaper Peek Button */}
+          <button
+            type="button"
+            onClick={() => setPeekWallpaper(!peekWallpaper)}
+            className="text-xs font-bold text-slate-700 bg-white/85 hover:bg-white backdrop-blur-md px-3 py-1.5 rounded-full border border-rose-100 shadow-2xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer shrink-0"
+            title="Toggle wallpaper view"
+          >
+            <Eye className="w-3.5 h-3.5 text-rose-500" />
+            <span className="hidden xs:inline">{peekWallpaper ? 'Dashboard' : 'Wallpaper'}</span>
+          </button>
+        </div>
       </div>
 
       {/* Main Home Dashboard Cards with Smooth Peek Transition */}
       <div className={`space-y-4 sm:space-y-5 transition-all duration-300 ${peekWallpaper ? 'opacity-0 pointer-events-none scale-95' : 'opacity-100 scale-100'}`}>
+        {/* Android Download & Installation Banner */}
+        <AndroidDownloadBanner />
+
         {/* Waiting for partner pairing card - WITH DIRECT CODE INPUT FIELD */}
         {((!isPartnerPaired || couple?.status === 'waiting_for_partner' || manualShowPairing) && !dismissPairingCard) ? (
           <div className="bg-gradient-to-br from-rose-500 via-pink-500 to-rose-600 rounded-[24px] p-4 sm:p-5 text-white shadow-xl shadow-rose-950/20 border border-white/30 relative overflow-hidden animate-in fade-in">
