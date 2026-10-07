@@ -62,17 +62,19 @@ export const Navigation: React.FC = () => {
               <span className="font-black text-base sm:text-lg tracking-tight text-slate-900 group-hover:text-rose-600 transition-colors leading-none">
                 Between<span className="text-rose-600">Us</span>
               </span>
-              <span className="text-[9px] sm:text-[10px] font-semibold text-rose-500/90 tracking-tight leading-tight mt-0.5 truncate">
-                {isDemoMode || !firebaseUser ? (
-                  'starts with TEJA and AKHILA'
-                ) : partnerUser?.name && partnerUser.name !== 'Partner' ? (
-                  `starts with ${currentUser.name.toUpperCase()} and ${partnerUser.name.toUpperCase()}`
-                ) : (
-                  `starts with ${currentUser.name.toUpperCase()}`
-                )}
+              <span className="font-black text-xs sm:text-sm tracking-wide text-rose-600 uppercase leading-tight mt-0.5">
+                TEJA and AKHILA
               </span>
             </div>
           </button>
+
+          {/* Permanent Couple Header Center Capsule */}
+          <div className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full bg-rose-50/90 border border-rose-200/80 shadow-2xs">
+            <span className="text-xs">💑</span>
+            <span className="font-black text-xs tracking-wider text-rose-600 uppercase">
+              TEJA and AKHILA
+            </span>
+          </div>
 
           {/* Emergency SOS Button */}
           <button

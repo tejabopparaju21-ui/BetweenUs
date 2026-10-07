@@ -225,19 +225,20 @@ export function generateCoupleCode(): string {
  * Format and derive a clean, pleasant display name from an email address or display name
  */
 export function getNameFromEmail(email: string, displayName?: string | null): string {
+  const cleanEmail = (email || '').trim().toLowerCase();
   const trimmedDisplay = displayName?.trim();
   const isGeneric = !trimmedDisplay || ['you', 'user', 'partner', 'admin', 'test'].includes(trimmedDisplay.toLowerCase());
 
-  const cleanEmail = (email || '').trim().toLowerCase();
-  const isEmailTeja = cleanEmail.startsWith('teja');
+  if (cleanEmail.includes('akhila') || (trimmedDisplay && trimmedDisplay.toLowerCase().includes('akhila'))) {
+    return 'Akhila';
+  }
+  if (cleanEmail.includes('teja') || (trimmedDisplay && trimmedDisplay.toLowerCase().includes('teja'))) {
+    return 'Teja';
+  }
 
-  // If displayName is non-generic and not a stale 'Teja' on a non-Teja email, use it
+  // If displayName is non-generic, use it
   if (trimmedDisplay && !isGeneric) {
-    if (trimmedDisplay.toLowerCase() === 'teja' && !isEmailTeja) {
-      // Stale test name assigned to a different user - fall through to extract from email
-    } else {
-      return trimmedDisplay;
-    }
+    return trimmedDisplay;
   }
 
   if (email && email.includes('@')) {
@@ -273,6 +274,11 @@ export function getNameFromEmail(email: string, displayName?: string | null): st
 export async function getOrCreateUserProfile(firebaseUser: FirebaseUser): Promise<UserProfile> {
   const userRef = doc(db, 'users', firebaseUser.uid);
   const derivedName = getNameFromEmail(firebaseUser.email || '', firebaseUser.displayName);
+  const cleanEmail = (firebaseUser.email || '').toLowerCase();
+  const isAkhila = derivedName.toLowerCase() === 'akhila' || cleanEmail.includes('akhila');
+  const isTeja = derivedName.toLowerCase() === 'teja' || cleanEmail.includes('teja');
+  const resolvedName = isAkhila ? 'Akhila' : isTeja ? 'Teja' : derivedName;
+  const defaultCity = isAkhila ? 'Bengaluru' : 'Hyderabad';
 
   try {
     const snap = await getDoc(userRef);
@@ -288,13 +294,21 @@ export async function getOrCreateUserProfile(firebaseUser: FirebaseUser): Promis
         shouldUpdate = true;
       }
 
-      // Check if existing document had 'Teja' or 'You' mistakenly assigned while email is someone else
-      const isEmailTeja = (firebaseUser.email || data.email || '').toLowerCase().startsWith('teja');
-      const isCurrentNameStale = !data.name || data.name === 'You' || (data.name.toLowerCase() === 'teja' && !isEmailTeja);
+      // Check if existing document had 'You' or wrong name
+      const isNameStale = !data.name || data.name === 'You' || data.name === 'Partner' ||
+        (isAkhila && data.name !== 'Akhila') ||
+        (isTeja && data.name !== 'Teja');
 
-      if (isCurrentNameStale && derivedName && derivedName !== 'You') {
-        data.name = derivedName;
-        updates.name = derivedName;
+      if (isNameStale) {
+        data.name = resolvedName;
+        updates.name = resolvedName;
+        shouldUpdate = true;
+      }
+
+      // Ensure proper city default for Teja (Hyderabad) or Akhila (Bengaluru)
+      if (!data.city || (isAkhila && data.city === 'Hyderabad') || (isTeja && data.city === 'Bengaluru')) {
+        data.city = defaultCity;
+        updates.city = defaultCity;
         shouldUpdate = true;
       }
 
@@ -319,11 +333,11 @@ export async function getOrCreateUserProfile(firebaseUser: FirebaseUser): Promis
   const newProfile: UserProfile = {
     id: firebaseUser.uid,
     uid: firebaseUser.uid,
-    name: derivedName,
+    name: resolvedName,
     email: firebaseUser.email || '',
     avatarUrl: firebaseUser.photoURL || '/app-logo.svg',
     timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Kolkata',
-    city: 'Hyderabad',
+    city: defaultCity,
     country: 'IN',
     anniversaryDate: new Date().toISOString().split('T')[0],
     sleepStartHour: 23,
@@ -458,18 +472,42 @@ export async function ensureUserPendingCouple(user: UserProfile): Promise<Couple
   const coupleId = `couple_${code.replace(/[^A-Z0-9]/g, '')}`;
   const coupleRef = doc(db, 'couples', coupleId);
 
+  const isUserTeja = (user.name || '').toLowerCase() === 'teja';
+  const myName = isUserTeja ? 'Teja' : 'Akhila';
+  const partnerName = isUserTeja ? 'Akhila' : 'Teja';
+
   try {
     const snap = await getDoc(coupleRef);
     if (snap.exists()) {
       const existing = snap.data() as Couple;
-      const isEmailTeja = (user.email || '').toLowerCase().startsWith('teja');
-      const isNameStale = !existing.partnerAName || existing.partnerAName === 'You' || (existing.partnerAName.toLowerCase() === 'teja' && !isEmailTeja);
-      if (existing.partnerAId === user.id && isNameStale && user.name && user.name !== existing.partnerAName) {
-        existing.partnerAName = user.name;
-        if (existing.status === 'waiting_for_partner') {
-          existing.relationshipName = `${user.name}'s Haven`;
-        }
-        await setDoc(coupleRef, { partnerAName: user.name, relationshipName: existing.relationshipName }, { merge: true });
+      let shouldUpdate = false;
+      const updates: Partial<Couple> = {};
+
+      if (!existing.partnerAName || existing.partnerAName === 'You') {
+        existing.partnerAName = myName;
+        updates.partnerAName = myName;
+        shouldUpdate = true;
+      }
+      if (!existing.partnerBName || existing.partnerBName === 'Partner' || existing.partnerBName.toLowerCase() === existing.partnerAName.toLowerCase()) {
+        existing.partnerBName = partnerName;
+        updates.partnerBName = partnerName;
+        shouldUpdate = true;
+      }
+      if (existing.partnerAName.toLowerCase() === existing.partnerBName.toLowerCase()) {
+        existing.partnerAName = 'Teja';
+        existing.partnerBName = 'Akhila';
+        updates.partnerAName = 'Teja';
+        updates.partnerBName = 'Akhila';
+        shouldUpdate = true;
+      }
+      if (!existing.relationshipName || existing.relationshipName.includes('Haven') || existing.relationshipName.includes('You')) {
+        existing.relationshipName = 'Teja & Akhila';
+        updates.relationshipName = 'Teja & Akhila';
+        shouldUpdate = true;
+      }
+
+      if (shouldUpdate) {
+        await setDoc(coupleRef, updates, { merge: true });
       }
       return existing;
     }
@@ -481,13 +519,13 @@ export async function ensureUserPendingCouple(user: UserProfile): Promise<Couple
     id: coupleId,
     code,
     partnerAId: user.id,
-    partnerAName: user.name || 'You',
+    partnerAName: myName,
     partnerBId: '',
-    partnerBName: '',
+    partnerBName: partnerName,
     status: 'waiting_for_partner',
     members: [user.id],
     partnerUids: [user.id],
-    relationshipName: user.name ? `${user.name}'s Haven` : 'Our Haven',
+    relationshipName: 'Teja & Akhila',
     anniversaryDate: user.anniversaryDate || new Date().toISOString().split('T')[0],
     nextMeetingDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
     nextMeetingTitle: 'Our Next Reunion',
@@ -538,17 +576,18 @@ export async function pairPartnersWithCode(
       if (!userSnap.empty) {
         const partnerUserData = userSnap.docs[0].data() as UserProfile;
         const coupleId = `couple_${cleanCode.replace(/[^A-Z0-9]/g, '')}`;
+        const pIsTeja = (partnerUserData.name || '').toLowerCase() === 'teja';
         couple = {
           id: coupleId,
           code: cleanCode,
           partnerAId: partnerUserData.id,
-          partnerAName: partnerUserData.name,
+          partnerAName: pIsTeja ? 'Teja' : 'Akhila',
           partnerBId: '',
-          partnerBName: '',
+          partnerBName: pIsTeja ? 'Akhila' : 'Teja',
           status: 'waiting_for_partner',
           members: [partnerUserData.id],
           partnerUids: [partnerUserData.id],
-          relationshipName: `${partnerUserData.name}'s Haven`,
+          relationshipName: 'Teja & Akhila',
           anniversaryDate: partnerUserData.anniversaryDate || new Date().toISOString().split('T')[0],
           nextMeetingDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
           nextMeetingTitle: 'Our Next Reunion',
@@ -593,10 +632,16 @@ export async function pairPartnersWithCode(
 
     // Pair currentUser as partnerB
     couple.partnerBId = currentUser.id;
-    couple.partnerBName = currentUser.name;
+    // Assign distinct names so partners are never both named 'Teja'
+    if (couple.partnerAName.toLowerCase() === 'teja') {
+      couple.partnerBName = currentUser.name.toLowerCase() === 'teja' ? 'Akhila' : (currentUser.name || 'Akhila');
+    } else if (couple.partnerAName.toLowerCase() === 'akhila') {
+      couple.partnerBName = currentUser.name.toLowerCase() === 'akhila' ? 'Teja' : (currentUser.name || 'Teja');
+    } else {
+      couple.partnerBName = currentUser.name || 'Akhila';
+    }
     couple.status = 'paired';
-    const partnerName = couple.partnerAName || 'Partner';
-    couple.relationshipName = `${partnerName} & ${currentUser.name}`;
+    couple.relationshipName = 'Teja & Akhila';
 
     const members = Array.from(new Set([couple.partnerAId, currentUser.id].filter(Boolean)));
     couple.members = members;

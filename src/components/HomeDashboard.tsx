@@ -259,10 +259,10 @@ export const HomeDashboard: React.FC = () => {
             </span>
             <span className="text-rose-500">❤️</span>
           </h2>
-          <p className="text-[11px] text-slate-500 font-medium">
+          <p className="text-[11px] sm:text-xs text-slate-600 font-bold">
             {bothShareLocation
-              ? `${distanceKm.toLocaleString()} km apart • Connected heart to heart`
-              : `Your private haven with ${partnerUser.name}`}
+              ? `${distanceKm.toLocaleString()} km apart • TEJA & AKHILA ❤️`
+              : `TEJA & AKHILA • Connected heart to heart ❤️`}
           </p>
         </div>
 
@@ -1226,6 +1226,20 @@ export const HomeDashboard: React.FC = () => {
               <Navigation2 className="w-3.5 h-3.5 rotate-45" />
             </button>
           </div>
+        </div>
+
+        {/* Bottom Dedication Section */}
+        <div className="text-center pt-6 pb-20">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-50/80 border border-rose-200/60 shadow-2xs mb-2">
+            <span className="text-rose-500 text-xs">❤️</span>
+            <span className="text-[11px] font-bold text-slate-700">Between<span className="text-rose-600">Us</span></span>
+          </div>
+          <p className="text-xs font-black text-rose-600 tracking-wide">
+            starts with TEJA and AKHILA
+          </p>
+          <p className="text-[10px] text-slate-400 mt-1 font-medium">
+            Hyderabad ❤️ Bengaluru • Connected heart to heart across the miles
+          </p>
         </div>
       </div>
       </div>

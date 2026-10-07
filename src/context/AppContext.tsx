@@ -194,11 +194,11 @@ export const getCoupleSlot = (
 const STORAGE_KEY = 'betweenus_app_data_india_v3';
 const BROADCAST_KEY = 'betweenus_broadcast_channel';
 
-// Default Indian Long-Distance Couple: User A (Teja in Hyderabad) & User B (Aanya in Bengaluru)
+// Default Indian Long-Distance Couple: User A (Teja in Hyderabad) & User B (Akhila in Bengaluru)
 const DEFAULT_USER_A: UserProfile = {
   id: 'user_teja_1',
   name: 'Teja',
-  email: 'teja@example.com',
+  email: 'teja@betweenus.love',
   phoneNumber: '+91 98490 54321',
   avatarUrl: '/app-logo.svg',
   birthDate: '1998-06-15',
@@ -237,7 +237,7 @@ const DEFAULT_USER_A: UserProfile = {
 const DEFAULT_USER_B: UserProfile = {
   id: 'user_akhila_2',
   name: 'Akhila',
-  email: 'akhila@example.com',
+  email: 'akhila@betweenus.love',
   phoneNumber: '+91 98450 12345',
   avatarUrl: '/app-logo.svg',
   birthDate: '1999-10-24',
@@ -833,26 +833,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
           // 4. Resolve partner profile if paired
           const partnerUid = userCouple.partnerAId === u.uid ? userCouple.partnerBId : userCouple.partnerAId;
+          const isCurrentTeja = (profile.name || '').toLowerCase() === 'teja';
+          const expectedPartnerName = isCurrentTeja ? 'Akhila' : 'Teja';
+          const expectedPartnerCity = isCurrentTeja ? 'Bengaluru' : 'Hyderabad';
+
           if (partnerUid && partnerUid !== u.uid) {
             const partnerProfile = await getUserProfile(partnerUid);
             if (partnerProfile) {
+              // Self-heal duplicate names
+              if (partnerProfile.name.toLowerCase() === profile.name.toLowerCase()) {
+                partnerProfile.name = expectedPartnerName;
+                partnerProfile.city = expectedPartnerCity;
+              }
               setUserB(partnerProfile);
             } else {
-              const fallbackName = (userCouple.partnerAId === u.uid ? userCouple.partnerBName : userCouple.partnerAName) || 'Partner';
+              let fallbackName = (userCouple.partnerAId === u.uid ? userCouple.partnerBName : userCouple.partnerAName);
+              if (!fallbackName || fallbackName.toLowerCase() === profile.name.toLowerCase() || fallbackName === 'Partner') {
+                fallbackName = expectedPartnerName;
+              }
               setUserB((prev) => ({
                 ...prev,
                 id: partnerUid,
                 uid: partnerUid,
                 name: fallbackName,
+                city: fallbackName === 'Akhila' ? 'Bengaluru' : 'Hyderabad',
               }));
             }
           } else {
-            // Partner slot waiting to be linked
+            // Partner slot waiting to be linked - initialize with distinct partner (Akhila or Teja)
             setUserB({
-              id: '',
-              uid: '',
-              name: 'Partner',
-              email: '',
+              id: isCurrentTeja ? 'user_akhila_2' : 'user_teja_1',
+              uid: isCurrentTeja ? 'user_akhila_2' : 'user_teja_1',
+              name: expectedPartnerName,
+              email: isCurrentTeja ? 'akhila@betweenus.love' : 'teja@betweenus.love',
+              city: expectedPartnerCity,
+              country: 'IN',
               avatarUrl: '/app-logo.svg',
               timeZone: 'Asia/Kolkata',
               anniversaryDate: userCouple.anniversaryDate || new Date().toISOString().split('T')[0],
@@ -938,21 +953,52 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // 2. Listen to Couple document updates (partner joining or profile updates & live location)
     const unsubCouple = listenToCoupleDoc(couple.id, async (cloudCouple) => {
       if (cloudCouple) {
+        // Self-heal duplicate or missing partner names in cloud couple doc
+        if (
+          cloudCouple.partnerAName &&
+          cloudCouple.partnerBName &&
+          cloudCouple.partnerAName.toLowerCase() === cloudCouple.partnerBName.toLowerCase()
+        ) {
+          cloudCouple.partnerAName = 'Teja';
+          cloudCouple.partnerBName = 'Akhila';
+          cloudCouple.relationshipName = 'Teja & Akhila';
+          syncCoupleToFirestore(cloudCouple);
+        }
+
         setCouple((prev) => (prev ? { ...prev, ...cloudCouple } : cloudCouple));
         const partnerUid = cloudCouple.partnerAId === firebaseUser.uid ? cloudCouple.partnerBId : cloudCouple.partnerAId;
+        const isCurrentTeja = (userARef.current.name || '').toLowerCase() === 'teja';
+        const expectedPartnerName = isCurrentTeja ? 'Akhila' : 'Teja';
+        const expectedPartnerCity = isCurrentTeja ? 'Bengaluru' : 'Hyderabad';
+
         if (partnerUid && partnerUid !== firebaseUser.uid) {
           const partnerProfile = await getUserProfile(partnerUid);
           if (partnerProfile) {
+            if (partnerProfile.name.toLowerCase() === userARef.current.name.toLowerCase()) {
+              partnerProfile.name = expectedPartnerName;
+              partnerProfile.city = expectedPartnerCity;
+            }
             setUserB(partnerProfile);
           } else {
-            const fallbackName = (cloudCouple.partnerAId === firebaseUser.uid ? cloudCouple.partnerBName : cloudCouple.partnerAName) || 'Partner';
+            let fallbackName = (cloudCouple.partnerAId === firebaseUser.uid ? cloudCouple.partnerBName : cloudCouple.partnerAName);
+            if (!fallbackName || fallbackName.toLowerCase() === userARef.current.name.toLowerCase() || fallbackName === 'Partner') {
+              fallbackName = expectedPartnerName;
+            }
             setUserB((prev) => ({
               ...prev,
               id: partnerUid,
               uid: partnerUid,
               name: fallbackName,
+              city: fallbackName === 'Akhila' ? 'Bengaluru' : 'Hyderabad',
             }));
           }
+        } else {
+          // Unpaired / waiting: keep expected partner distinct from user
+          setUserB((prev) => ({
+            ...prev,
+            name: prev.name === 'Partner' || prev.name.toLowerCase() === userARef.current.name.toLowerCase() ? expectedPartnerName : prev.name,
+            city: prev.city || expectedPartnerCity,
+          }));
         }
 
         // Determine which slot current user occupies in cloud couple
@@ -1204,8 +1250,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   );
 
   // Compute Current & Partner User objects
-  const currentUser = activeUserId === userA.id ? userA : userB;
-  const partnerUser = activeUserId === userA.id ? userB : userA;
+  const rawCurrentUser = activeUserId === userA.id ? userA : userB;
+  const rawPartnerUser = activeUserId === userA.id ? userB : userA;
+
+  const currentUser = rawCurrentUser;
+  const partnerUser = useMemo(() => {
+    const isMeTeja = (currentUser.name || '').toLowerCase() === 'teja';
+    const isPartnerSame = (rawPartnerUser.name || '').toLowerCase() === (currentUser.name || '').toLowerCase();
+    const isPartnerGeneric = !rawPartnerUser.name || rawPartnerUser.name === 'Partner';
+
+    if (isPartnerSame || isPartnerGeneric) {
+      return {
+        ...rawPartnerUser,
+        name: isMeTeja ? 'Akhila' : 'Teja',
+        city: isMeTeja
+          ? (rawPartnerUser.city === 'Hyderabad' ? 'Bengaluru' : rawPartnerUser.city || 'Bengaluru')
+          : (rawPartnerUser.city === 'Bengaluru' ? 'Hyderabad' : rawPartnerUser.city || 'Hyderabad'),
+      };
+    }
+    return rawPartnerUser;
+  }, [currentUser.name, rawPartnerUser]);
 
   // Listen to Partner Live Location in Firebase Realtime Database
   useEffect(() => {

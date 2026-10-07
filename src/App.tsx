@@ -41,8 +41,10 @@ function MainAppContent() {
             ✨
           </div>
         </div>
-        <h2 className="text-xl font-bold text-gray-900 mb-1">BetweenUs</h2>
-        <p className="text-sm text-gray-500 font-medium">Connecting hearts across the distance...</p>
+        <h2 className="text-2xl font-black text-gray-900 mb-0.5">Between<span className="text-rose-600">Us</span></h2>
+        <p className="text-sm font-black text-rose-600 uppercase tracking-wider mb-2">TEJA and AKHILA</p>
+        <p className="text-xs text-gray-500 font-medium">Connecting hearts across the distance...</p>
+        <p className="text-[11px] font-bold text-rose-400 mt-6">starts with TEJA and AKHILA</p>
       </div>
     );
   }

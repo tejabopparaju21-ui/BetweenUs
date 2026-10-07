@@ -59,6 +59,8 @@ export const CoupleChat: React.FC = () => {
     firebaseUser,
     loginWithGoogle,
     startCall,
+    isDemoMode,
+    switchActiveUser,
   } = useApp();
 
   const [inputVal, setInputVal] = useState('');
@@ -531,6 +533,19 @@ export const CoupleChat: React.FC = () => {
 
         {/* Partner Connection & Couple Code Quick Link */}
         <div className="flex items-center gap-1.5 text-[11px] text-slate-500 font-medium">
+          {isDemoMode && (
+            <button
+              type="button"
+              onClick={() => {
+                const nextUser = currentUser.name.toLowerCase() === 'teja' ? 'user_akhila_2' : 'user_teja_1';
+                switchActiveUser(nextUser);
+              }}
+              className="flex items-center gap-1 text-[10px] font-extrabold text-white bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 px-2 py-0.5 rounded-lg shadow-2xs transition active:scale-95 cursor-pointer"
+              title="Switch demo persona to test both sides of the chat"
+            >
+              <span>Chat as {currentUser.name.toLowerCase() === 'teja' ? 'Akhila' : 'Teja'} 🔁</span>
+            </button>
+          )}
           <button
             type="button"
             onClick={() => window.dispatchEvent(new CustomEvent('open_pairing_modal'))}
@@ -586,18 +601,35 @@ export const CoupleChat: React.FC = () => {
               <Heart className="w-7 h-7 fill-rose-500 text-rose-500 animate-pulse" />
             </div>
             <h3 className="font-bold text-slate-800 text-sm">Your Private Haven is Ready</h3>
-            <p className="text-xs text-slate-500 mt-1.5 max-w-xs leading-relaxed">
+            <p className="text-xs font-bold text-rose-500 mt-0.5">
+              starts with TEJA and AKHILA
+            </p>
+            <p className="text-xs text-slate-500 mt-1 max-w-xs leading-relaxed">
               Send the first sweet message to {partnerUser.name}. Messages are stored permanently in Cloud Firestore and sync in real time across devices.
             </p>
           </div>
         )}
 
         {displayMessages.map((msg: ChatMessage) => {
-          const isMe =
-            msg.senderId === currentUser.id ||
-            msg.senderId === currentUser.uid ||
-            (firebaseUser ? msg.senderId === firebaseUser.uid : false) ||
-            (Boolean(msg.senderName) && Boolean(currentUser.name) && msg.senderName.trim().toLowerCase() === currentUser.name.trim().toLowerCase());
+          const partnerNameLower = (partnerUser.name || '').trim().toLowerCase();
+          const currentNameLower = (currentUser.name || '').trim().toLowerCase();
+          const msgSenderNameLower = (msg.senderName || '').trim().toLowerCase();
+
+          // 1. Check if definitely sent by partner
+          const isFromPartner =
+            (Boolean(partnerUser.id) && msg.senderId === partnerUser.id) ||
+            (Boolean(partnerUser.uid) && msg.senderId === partnerUser.uid) ||
+            (Boolean(msgSenderNameLower) && Boolean(partnerNameLower) && msgSenderNameLower === partnerNameLower);
+
+          // 2. Check if sent by me
+          const isFromMe =
+            (Boolean(currentUser.id) && msg.senderId === currentUser.id) ||
+            (Boolean(currentUser.uid) && msg.senderId === currentUser.uid) ||
+            (Boolean(firebaseUser?.uid) && msg.senderId === firebaseUser.uid) ||
+            (Boolean(msgSenderNameLower) && Boolean(currentNameLower) && msgSenderNameLower === currentNameLower);
+
+          // Partner messages must NEVER be classified as 'Me'
+          const isMe = !isFromPartner && Boolean(isFromMe);
 
           return (
             <div
@@ -606,7 +638,7 @@ export const CoupleChat: React.FC = () => {
             >
               {/* Partner Sender Name */}
               {!isMe && (
-                <span className="text-[10px] text-slate-500 font-bold mb-0.5 ml-2">
+                <span className="text-[10px] text-rose-600 font-bold mb-0.5 ml-2">
                   {msg.senderName || partnerUser.name}
                 </span>
               )}

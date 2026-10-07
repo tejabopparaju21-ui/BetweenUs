@@ -607,6 +607,16 @@ export const MemoriesSection: React.FC = () => {
           </form>
         </div>
       )}
+
+      {/* Bottom Dedication Footer */}
+      <div className="text-center pt-8 pb-16 text-slate-400">
+        <p className="text-xs font-bold text-slate-600">
+          Between<span className="text-rose-600">Us</span>
+        </p>
+        <p className="text-[11px] font-bold text-rose-500 mt-0.5">
+          starts with TEJA and AKHILA
+        </p>
+      </div>
     </div>
   );
 };

@@ -104,8 +104,8 @@ export const AuthScreen: React.FC = () => {
         <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
           Between<span className="text-rose-600">Us</span>
         </h1>
-        <p className="text-[11px] sm:text-xs font-bold text-rose-500 tracking-wide mt-1">
-          starts with TEJA and AKHILA
+        <p className="text-sm sm:text-base font-black text-rose-600 uppercase tracking-wider mt-1">
+          TEJA and AKHILA
         </p>
         <p className="text-xs sm:text-sm font-semibold text-rose-600 mt-1">
           Your Private Long-Distance Haven
@@ -394,13 +394,32 @@ export const AuthScreen: React.FC = () => {
               </button>
             </div>
 
-            <button
-              type="button"
-              onClick={fillQuickTestCredentials}
-              className="w-full py-1.5 px-2 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 text-[10px] font-semibold transition text-center cursor-pointer"
-            >
-              Quick Test: Fill Sample Account (teja@betweenus.love)
-            </button>
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail('teja@betweenus.love');
+                  setPassword('betweenus2026');
+                  setName('Teja');
+                  setIsEmailMode(true);
+                }}
+                className="py-1.5 px-2 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 text-[10px] font-bold transition text-center cursor-pointer shadow-2xs"
+              >
+                👦 Test as TEJA
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail('akhila@betweenus.love');
+                  setPassword('betweenus2026');
+                  setName('Akhila');
+                  setIsEmailMode(true);
+                }}
+                className="py-1.5 px-2 rounded-xl bg-pink-50 hover:bg-pink-100 border border-pink-200 text-pink-700 text-[10px] font-bold transition text-center cursor-pointer shadow-2xs"
+              >
+                👧 Test as AKHILA
+              </button>
+            </div>
           </form>
         )}
       </div>
@@ -417,6 +436,9 @@ export const AuthScreen: React.FC = () => {
         </button>
         <p className="text-[10px] text-slate-400 mt-3">
           Protected by Google Firebase Authentication & Cloud Firestore.
+        </p>
+        <p className="text-[10px] font-bold text-rose-500 mt-1">
+          BetweenUs • starts with TEJA and AKHILA
         </p>
       </div>
     </div>
