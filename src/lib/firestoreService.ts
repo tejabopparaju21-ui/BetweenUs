@@ -1041,3 +1041,35 @@ export async function syncActiveCallToFirestore(
     console.warn('syncActiveCallToFirestore notice:', err);
   }
 }
+
+/**
+ * Incrementally sync partial call updates (SDP, ICE candidates, reactions) using field paths
+ * so caller and recipient never overwrite each other's signaling data in Firestore.
+ */
+export async function syncCallUpdatesToFirestore(
+  coupleId: string,
+  updates: Record<string, any>
+): Promise<void> {
+  if (!coupleId || !updates) return;
+  try {
+    const coupleRef = doc(db, 'couples', coupleId);
+    const firestoreUpdates: Record<string, any> = {
+      updatedAt: new Date().toISOString(),
+    };
+
+    for (const [key, val] of Object.entries(updates)) {
+      if (val === undefined) continue;
+      if (key === 'iceCandidatesCaller' && Array.isArray(val) && val.length > 0) {
+        firestoreUpdates['activeCall.iceCandidatesCaller'] = arrayUnion(...val);
+      } else if (key === 'iceCandidatesRecipient' && Array.isArray(val) && val.length > 0) {
+        firestoreUpdates['activeCall.iceCandidatesRecipient'] = arrayUnion(...val);
+      } else {
+        firestoreUpdates[`activeCall.${key}`] = val;
+      }
+    }
+
+    await setDoc(coupleRef, firestoreUpdates, { merge: true });
+  } catch (err) {
+    console.warn('syncCallUpdatesToFirestore notice:', err);
+  }
+}

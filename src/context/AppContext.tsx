@@ -49,6 +49,7 @@ import {
   syncPartnerLocationToFirestore,
   syncEmergencyAlertToFirestore,
   syncActiveCallToFirestore,
+  syncCallUpdatesToFirestore,
   loginWithGoogle as fbLoginWithGoogle,
   loginWithEmail as fbLoginWithEmail,
   registerWithEmail as fbRegisterWithEmail,
@@ -2626,6 +2627,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ...current,
         ...updates,
       };
+      if (updates.iceCandidatesCaller && current.iceCandidatesCaller) {
+        updated.iceCandidatesCaller = Array.from(new Set([...current.iceCandidatesCaller, ...updates.iceCandidatesCaller]));
+      }
+      if (updates.iceCandidatesRecipient && current.iceCandidatesRecipient) {
+        updated.iceCandidatesRecipient = Array.from(new Set([...current.iceCandidatesRecipient, ...updates.iceCandidatesRecipient]));
+      }
       activeCallRef.current = updated;
       setActiveCall(updated);
       saveAndBroadcast({ activeCall: updated });
@@ -2636,7 +2643,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         });
       }
       if (couple?.id) {
-        await syncActiveCallToFirestore(couple.id, updated);
+        await syncCallUpdatesToFirestore(couple.id, updates);
       }
     },
     [couple?.id, broadcastChannel, saveAndBroadcast]
