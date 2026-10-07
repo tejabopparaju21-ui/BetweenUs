@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useApp } from '../context/AppContext';
+import { useApp, getCoupleSlot } from '../context/AppContext';
 import {
   ShieldAlert,
   Phone,
@@ -28,7 +28,7 @@ export const HomeEmergencyButton: React.FC = () => {
 
   const partnerPhone =
     partnerUser.phoneNumber ||
-    (currentUser.id === couple?.partnerAId ? couple?.partnerBPhoneNumber : couple?.partnerAPhoneNumber) ||
+    (getCoupleSlot(currentUser.id, couple) === 'partnerA' ? couple?.partnerBPhoneNumber : couple?.partnerAPhoneNumber) ||
     partnerUser.emergencyContacts?.[0]?.phone ||
     '';
 

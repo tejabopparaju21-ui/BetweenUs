@@ -109,17 +109,51 @@ export const SettingsSection: React.FC = () => {
   const [sleepEnd, setSleepEnd] = useState(currentUser.sleepEndHour);
   const [avatarUrl, setAvatarUrl] = useState(currentUser.avatarUrl);
 
-  // Keep form fields in sync when currentUser changes
+  // User dirty fields and last loaded user ID tracking to prevent input overwrite while typing
+  const userDirtyFieldsRef = React.useRef<Set<string>>(new Set());
+  const lastSyncedUserIdRef = React.useRef<string>(currentUser.id);
+
+  // Status badges & spinners for profile & phone saves
+  const [isSavingPhone, setIsSavingPhone] = useState(false);
+  const [phoneSavedBadge, setPhoneSavedBadge] = useState(false);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [profileSavedBadge, setProfileSavedBadge] = useState(false);
+
+  // Keep form fields in sync when currentUser changes without overwriting user's active typing
   useEffect(() => {
-    setName(currentUser.name);
-    setPhoneNumber(currentUser.phoneNumber || '');
-    setCity(currentUser.city || '');
-    setCountry(currentUser.country || 'IN');
-    setTimeZone(currentUser.timeZone);
-    setAnniversary(currentUser.anniversaryDate);
-    setSleepStart(currentUser.sleepStartHour);
-    setSleepEnd(currentUser.sleepEndHour);
-    setAvatarUrl(currentUser.avatarUrl);
+    const isNewUser = currentUser.id !== lastSyncedUserIdRef.current;
+    if (isNewUser) {
+      lastSyncedUserIdRef.current = currentUser.id;
+      userDirtyFieldsRef.current.clear();
+    }
+
+    if (isNewUser || !userDirtyFieldsRef.current.has('name')) {
+      setName(currentUser.name);
+    }
+    if (isNewUser || !userDirtyFieldsRef.current.has('phoneNumber')) {
+      setPhoneNumber(currentUser.phoneNumber || '');
+    }
+    if (isNewUser || !userDirtyFieldsRef.current.has('city')) {
+      setCity(currentUser.city || '');
+    }
+    if (isNewUser || !userDirtyFieldsRef.current.has('country')) {
+      setCountry(currentUser.country || 'IN');
+    }
+    if (isNewUser || !userDirtyFieldsRef.current.has('timeZone')) {
+      setTimeZone(currentUser.timeZone);
+    }
+    if (isNewUser || !userDirtyFieldsRef.current.has('anniversary')) {
+      setAnniversary(currentUser.anniversaryDate);
+    }
+    if (isNewUser || !userDirtyFieldsRef.current.has('sleepStart')) {
+      setSleepStart(currentUser.sleepStartHour);
+    }
+    if (isNewUser || !userDirtyFieldsRef.current.has('sleepEnd')) {
+      setSleepEnd(currentUser.sleepEndHour);
+    }
+    if (isNewUser || !userDirtyFieldsRef.current.has('avatarUrl')) {
+      setAvatarUrl(currentUser.avatarUrl);
+    }
   }, [currentUser]);
 
   // Couple Code States
@@ -139,12 +173,38 @@ export const SettingsSection: React.FC = () => {
   const [profileSuccessMsg, setProfileSuccessMsg] = useState<string | null>(null);
   const [killSwitchTriggered, setKillSwitchTriggered] = useState(false);
 
-  const handleSaveProfile = (e: React.FormEvent) => {
-    e.preventDefault();
-    const matchedCity = findIndianCity(city.trim());
+  const handleSavePhone = (e?: React.SyntheticEvent) => {
+    e?.preventDefault?.();
+    setIsSavingPhone(true);
+    const cleanPhone = phoneNumber.trim();
+
     updateUserProfile({
-      name: name.trim(),
-      phoneNumber: phoneNumber.trim(),
+      phoneNumber: cleanPhone,
+    });
+
+    userDirtyFieldsRef.current.delete('phoneNumber');
+    setPhoneSavedBadge(true);
+    setProfileSuccessMsg(`Phone number updated: ${cleanPhone || 'Cleared'}`);
+
+    setTimeout(() => {
+      setIsSavingPhone(false);
+      setTimeout(() => {
+        setPhoneSavedBadge(false);
+        setProfileSuccessMsg(null);
+      }, 4000);
+    }, 300);
+  };
+
+  const handleSaveProfile = (e?: React.SyntheticEvent) => {
+    e?.preventDefault?.();
+    setIsSavingProfile(true);
+    const matchedCity = findIndianCity(city.trim());
+    const cleanName = name.trim() || currentUser.name;
+    const cleanPhone = phoneNumber.trim();
+
+    updateUserProfile({
+      name: cleanName,
+      phoneNumber: cleanPhone,
       city: matchedCity ? matchedCity.displayName : city.trim(),
       country: 'IN',
       timeZone: 'Asia/Kolkata',
@@ -162,8 +222,32 @@ export const SettingsSection: React.FC = () => {
           }
         : currentUser.location,
     });
-    setProfileSuccessMsg('Profile updated! Timings set to Indian Standard Time (IST).');
-    setTimeout(() => setProfileSuccessMsg(null), 3000);
+
+    userDirtyFieldsRef.current.clear();
+    setProfileSavedBadge(true);
+    setProfileSuccessMsg('Profile updated! Changes saved & synced with your partner.');
+
+    setTimeout(() => {
+      setIsSavingProfile(false);
+      setTimeout(() => {
+        setProfileSavedBadge(false);
+        setProfileSuccessMsg(null);
+      }, 4000);
+    }, 300);
+  };
+
+  const handleAvatarFile = async (file: File) => {
+    try {
+      // 360px max dimension ensures high visual quality on Retina phones while keeping base64 < 30KB
+      const res = await readFileAsDataUrl(file, 360);
+      setAvatarUrl(res.url);
+      userDirtyFieldsRef.current.add('avatarUrl');
+      updateUserProfile({ avatarUrl: res.url });
+      setProfileSuccessMsg('Profile photo updated successfully!');
+      setTimeout(() => setProfileSuccessMsg(null), 3000);
+    } catch (err) {
+      console.error('Avatar upload error:', err);
+    }
   };
 
   const [copiedLink, setCopiedLink] = useState(false);
@@ -252,17 +336,9 @@ export const SettingsSection: React.FC = () => {
               type="file"
               accept="image/*"
               className="hidden"
-              onChange={async (e) => {
+              onChange={(e) => {
                 const file = e.target.files?.[0];
-                if (file) {
-                  try {
-                    const res = await readFileAsDataUrl(file);
-                    setAvatarUrl(res.url);
-                    updateUserProfile({ avatarUrl: res.url });
-                  } catch (err) {
-                    console.error(err);
-                  }
-                }
+                if (file) handleAvatarFile(file);
               }}
             />
           </label>
@@ -352,22 +428,18 @@ export const SettingsSection: React.FC = () => {
                       type="file"
                       accept="image/*"
                       className="hidden"
-                      onChange={async (e) => {
+                      onChange={(e) => {
                         const file = e.target.files?.[0];
-                        if (file) {
-                          try {
-                            const res = await readFileAsDataUrl(file);
-                            setAvatarUrl(res.url);
-                          } catch (err) {
-                            console.error(err);
-                          }
-                        }
+                        if (file) handleAvatarFile(file);
                       }}
                     />
                   </label>
                   <button
                     type="button"
-                    onClick={() => setAvatarUrl('/app-logo.svg')}
+                    onClick={() => {
+                      setAvatarUrl('/app-logo.svg');
+                      userDirtyFieldsRef.current.add('avatarUrl');
+                    }}
                     className="px-3 py-1.5 rounded-xl text-xs font-semibold border border-rose-200 bg-white text-rose-700 hover:bg-rose-50 transition"
                   >
                     Use Couple Hands
@@ -382,7 +454,10 @@ export const SettingsSection: React.FC = () => {
               <input
                 type="text"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  userDirtyFieldsRef.current.add('name');
+                }}
                 className="w-full text-xs px-3 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-rose-400"
                 required
               />
@@ -519,11 +594,30 @@ export const SettingsSection: React.FC = () => {
               </div>
             </div>
 
+            {profileSavedBadge && (
+              <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-1.5 animate-fade-in">
+                <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>Profile changes saved & synced with {partnerUser.name}!</span>
+              </div>
+            )}
+
             <button
               type="submit"
-              className="w-full min-h-[44px] py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl shadow-xs transition active:scale-98 cursor-pointer"
+              disabled={isSavingProfile}
+              className={`w-full min-h-[44px] py-2.5 ${
+                profileSavedBadge ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'
+              } text-white font-bold text-xs rounded-xl shadow-xs transition active:scale-98 cursor-pointer flex items-center justify-center gap-2`}
             >
-              Save Profile Changes
+              {profileSavedBadge ? (
+                <>
+                  <Check className="w-4 h-4" />
+                  <span>Profile Changes Saved!</span>
+                </>
+              ) : isSavingProfile ? (
+                <span>Saving Profile Changes...</span>
+              ) : (
+                <span>Save Profile Changes</span>
+              )}
             </button>
           </form>
         )}
@@ -576,7 +670,10 @@ export const SettingsSection: React.FC = () => {
               <input
                 type="tel"
                 value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
+                onChange={(e) => {
+                  setPhoneNumber(e.target.value);
+                  userDirtyFieldsRef.current.add('phoneNumber');
+                }}
                 placeholder="+91 98490 54321"
                 className="w-full text-xs px-3 py-2.5 rounded-xl border border-slate-200 font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-rose-400"
               />
@@ -632,12 +729,34 @@ export const SettingsSection: React.FC = () => {
               </div>
             </div>
 
+            {phoneSavedBadge && (
+              <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-1.5 animate-fade-in">
+                <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>Phone number saved! Directly connected to {partnerUser.name}'s emergency siren & dialer.</span>
+              </div>
+            )}
+
             <button
               type="button"
-              onClick={handleSaveProfile}
-              className="w-full min-h-[44px] py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition active:scale-98 cursor-pointer"
+              onClick={handleSavePhone}
+              disabled={isSavingPhone}
+              className={`w-full min-h-[44px] py-2.5 ${
+                phoneSavedBadge ? 'bg-emerald-700' : 'bg-emerald-600 hover:bg-emerald-700'
+              } text-white font-bold text-xs rounded-xl shadow-xs transition active:scale-98 cursor-pointer flex items-center justify-center gap-2`}
             >
-              Save Phone Settings
+              {phoneSavedBadge ? (
+                <>
+                  <Check className="w-4 h-4" />
+                  <span>Phone Settings Saved!</span>
+                </>
+              ) : isSavingPhone ? (
+                <span>Saving Phone Number...</span>
+              ) : (
+                <>
+                  <Phone className="w-3.5 h-3.5" />
+                  <span>Save Phone Settings</span>
+                </>
+              )}
             </button>
           </div>
         )}
@@ -689,6 +808,7 @@ export const SettingsSection: React.FC = () => {
                   onChange={(e) => {
                     if (e.target.value !== 'custom') {
                       setCity(e.target.value);
+                      userDirtyFieldsRef.current.add('city');
                     }
                   }}
                   className="w-full text-xs px-3 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-800"
@@ -704,7 +824,10 @@ export const SettingsSection: React.FC = () => {
                 <input
                   type="text"
                   value={city}
-                  onChange={(e) => setCity(e.target.value)}
+                  onChange={(e) => {
+                    setCity(e.target.value);
+                    userDirtyFieldsRef.current.add('city');
+                  }}
                   placeholder="Or type your city, e.g. Visakhapatnam, Chandigarh, etc."
                   className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 text-slate-700"
                 />

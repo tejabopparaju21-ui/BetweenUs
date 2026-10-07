@@ -3,7 +3,7 @@
  * Reads images/videos from the native file system, optimizes resolution for fast local/cloud sync.
  */
 
-export async function readFileAsDataUrl(file: File): Promise<{
+export async function readFileAsDataUrl(file: File, maxDimension: number = 1280): Promise<{
   url: string;
   type: 'image' | 'video';
   fileName: string;
@@ -12,7 +12,7 @@ export async function readFileAsDataUrl(file: File): Promise<{
   const isVideo = file.type.startsWith('video/');
 
   return new Promise((resolve, reject) => {
-    // If it's an image, optimize down to max 1280px to save storage/bandwidth
+    // If it's an image, optimize down to maxDimension to save storage/bandwidth
     if (!isVideo && file.type.startsWith('image/')) {
       const reader = new FileReader();
       reader.onload = (e) => {
@@ -21,7 +21,7 @@ export async function readFileAsDataUrl(file: File): Promise<{
 
         const img = new Image();
         img.onload = () => {
-          const maxDim = 1280;
+          const maxDim = maxDimension;
           let width = img.width;
           let height = img.height;
 

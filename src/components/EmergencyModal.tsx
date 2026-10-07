@@ -5,7 +5,7 @@
  */
 
 import React, { useState } from 'react';
-import { useApp } from '../context/AppContext';
+import { useApp, getCoupleSlot } from '../context/AppContext';
 import { getEmergencyNumberForCountry } from '../utils/emergencyNumbers';
 import {
   AlertTriangle,
@@ -39,7 +39,7 @@ export const EmergencyModal: React.FC<EmergencyModalProps> = ({ isOpen, onClose 
 
   const partnerPhone =
     partnerUser.phoneNumber ||
-    (currentUser.id === couple?.partnerAId ? couple?.partnerBPhoneNumber : couple?.partnerAPhoneNumber) ||
+    (getCoupleSlot(currentUser.id, couple) === 'partnerA' ? couple?.partnerBPhoneNumber : couple?.partnerAPhoneNumber) ||
     partnerUser.emergencyContacts?.[0]?.phone ||
     '';
 

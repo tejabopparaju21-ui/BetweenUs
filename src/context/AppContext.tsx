@@ -35,6 +35,7 @@ import {
   listenToCoupleMoods,
   listenToCoupleMemories,
   listenToCoupleDoc,
+  listenToUserDoc,
   joinCoupleInFirestore,
   pairPartnersWithCode,
   unlinkCoupleInFirestore,
@@ -173,6 +174,20 @@ interface AppContextType {
 }
 
 const AppContext = createContext<AppContextType | null>(null);
+
+/**
+ * Resolves whether a given userId is partnerA or partnerB in the couple document.
+ */
+export const getCoupleSlot = (
+  userId: string | undefined,
+  coupleDoc: Couple | null | undefined
+): 'partnerA' | 'partnerB' => {
+  if (!coupleDoc || !userId) return 'partnerA';
+  if (coupleDoc.partnerBId && coupleDoc.partnerBId === userId) {
+    return 'partnerB';
+  }
+  return 'partnerA';
+};
 
 const STORAGE_KEY = 'betweenus_app_data_india_v3';
 const BROADCAST_KEY = 'betweenus_broadcast_channel';
@@ -914,37 +929,44 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           }
         }
 
-        // Live location synchronization from cloud couple doc
-        if (cloudCouple.partnerALocation || cloudCouple.partnerAShareLocation !== undefined) {
-          setUserA((prev) => ({
-            ...prev,
-            location: cloudCouple.partnerALocation ?? prev.location,
-            shareLocation: cloudCouple.partnerAShareLocation !== undefined ? cloudCouple.partnerAShareLocation : prev.shareLocation,
-            city: cloudCouple.partnerACity || prev.city,
-          }));
-        }
-        if (cloudCouple.partnerBLocation || cloudCouple.partnerBShareLocation !== undefined) {
-          setUserB((prev) => ({
-            ...prev,
-            location: cloudCouple.partnerBLocation ?? prev.location,
-            shareLocation: cloudCouple.partnerBShareLocation !== undefined ? cloudCouple.partnerBShareLocation : prev.shareLocation,
-            city: cloudCouple.partnerBCity || prev.city,
-          }));
-        }
+        // Determine which slot current user occupies in cloud couple
+        const mySlot = getCoupleSlot(firebaseUser.uid, cloudCouple);
+        const isMySlotA = mySlot === 'partnerA';
 
-        // Partner phone numbers sync from cloud couple doc
-        if ((cloudCouple as any).partnerAPhoneNumber) {
-          setUserA((prev) => ({
-            ...prev,
-            phoneNumber: (cloudCouple as any).partnerAPhoneNumber,
-          }));
-        }
-        if ((cloudCouple as any).partnerBPhoneNumber) {
-          setUserB((prev) => ({
-            ...prev,
-            phoneNumber: (cloudCouple as any).partnerBPhoneNumber,
-          }));
-        }
+        // Extract cloud fields accurately for current user vs partner
+        const myCloudPhone = isMySlotA
+          ? (cloudCouple as any).partnerAPhoneNumber
+          : (cloudCouple as any).partnerBPhoneNumber;
+        const partnerCloudPhone = isMySlotA
+          ? (cloudCouple as any).partnerBPhoneNumber
+          : (cloudCouple as any).partnerAPhoneNumber;
+
+        const myCloudLoc = isMySlotA ? cloudCouple.partnerALocation : cloudCouple.partnerBLocation;
+        const partnerCloudLoc = isMySlotA ? cloudCouple.partnerBLocation : cloudCouple.partnerALocation;
+
+        const myCloudShareLoc = isMySlotA ? cloudCouple.partnerAShareLocation : cloudCouple.partnerBShareLocation;
+        const partnerCloudShareLoc = isMySlotA ? cloudCouple.partnerBShareLocation : cloudCouple.partnerAShareLocation;
+
+        const myCloudCity = isMySlotA ? cloudCouple.partnerACity : cloudCouple.partnerBCity;
+        const partnerCloudCity = isMySlotA ? cloudCouple.partnerBCity : cloudCouple.partnerACity;
+
+        // Current user (userA) updates
+        setUserA((prev) => ({
+          ...prev,
+          phoneNumber: myCloudPhone !== undefined && myCloudPhone !== '' ? myCloudPhone : prev.phoneNumber,
+          location: myCloudLoc !== undefined ? myCloudLoc : prev.location,
+          shareLocation: myCloudShareLoc !== undefined ? myCloudShareLoc : prev.shareLocation,
+          city: myCloudCity || prev.city,
+        }));
+
+        // Partner (userB) updates
+        setUserB((prev) => ({
+          ...prev,
+          phoneNumber: partnerCloudPhone !== undefined && partnerCloudPhone !== '' ? partnerCloudPhone : prev.phoneNumber,
+          location: partnerCloudLoc !== undefined ? partnerCloudLoc : prev.location,
+          shareLocation: partnerCloudShareLoc !== undefined ? partnerCloudShareLoc : prev.shareLocation,
+          city: partnerCloudCity || prev.city,
+        }));
 
         // Emergency SOS Alert synchronization from cloud couple doc
         if ((cloudCouple as any).activeEmergencyAlert !== undefined) {
@@ -963,6 +985,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             setActiveCall(cloudCall);
           }
         }
+      }
+    });
+
+    // 3. Listen to Partner's User Document in real-time
+    const partnerUid = couple.partnerAId === firebaseUser.uid ? couple.partnerBId : couple.partnerAId;
+    let unsubPartnerDoc = () => {};
+    if (partnerUid && partnerUid !== firebaseUser.uid) {
+      unsubPartnerDoc = listenToUserDoc(partnerUid, (partnerProfile) => {
+        if (partnerProfile) {
+          setUserB((prev) => ({
+            ...prev,
+            ...partnerProfile,
+          }));
+        }
+      });
+    }
+
+    // 4. Listen to Current User's Document in real-time
+    const unsubMyDoc = listenToUserDoc(firebaseUser.uid, (myCloudProfile) => {
+      if (myCloudProfile) {
+        setUserA((prev) => ({
+          ...prev,
+          ...myCloudProfile,
+        }));
       }
     });
 
@@ -995,6 +1041,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => {
       unsubMsgs();
       unsubCouple();
+      unsubPartnerDoc();
+      unsubMyDoc();
       unsubMoods();
       unsubMemories();
     };
@@ -1745,32 +1793,82 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // 11. Profile & Settings Updates
   const updateUserProfile = useCallback(
     (updates: Partial<UserProfile>) => {
-      const isTargetA = activeUserId === userA.id;
+      const isTargetA = currentUser.id === userA.id;
+      const targetUser = isTargetA ? userA : userB;
+      const updatedUser: UserProfile = { ...targetUser, ...updates };
+
       if (isTargetA) {
-        const updated = { ...userA, ...updates };
-        setUserA(updated);
-        saveAndBroadcast({ userA: updated });
-        syncUserToFirestore(updated);
-        if (couple && updates.phoneNumber !== undefined) {
-          syncCoupleToFirestore({
-            ...couple,
-            partnerAPhoneNumber: updates.phoneNumber,
-          } as any);
-        }
+        setUserA(updatedUser);
       } else {
-        const updated = { ...userB, ...updates };
-        setUserB(updated);
-        saveAndBroadcast({ userB: updated });
-        syncUserToFirestore(updated);
-        if (couple && updates.phoneNumber !== undefined) {
-          syncCoupleToFirestore({
-            ...couple,
-            partnerBPhoneNumber: updates.phoneNumber,
-          } as any);
+        setUserB(updatedUser);
+      }
+
+      saveAndBroadcast(isTargetA ? { userA: updatedUser } : { userB: updatedUser });
+      syncUserToFirestore(updatedUser);
+
+      if (couple) {
+        const slot = getCoupleSlot(targetUser.id || firebaseUser?.uid, couple);
+        const coupleUpdates: Record<string, any> = {
+          updatedAt: new Date().toISOString(),
+        };
+
+        if (updates.phoneNumber !== undefined) {
+          if (slot === 'partnerA') {
+            coupleUpdates.partnerAPhoneNumber = updates.phoneNumber;
+          } else {
+            coupleUpdates.partnerBPhoneNumber = updates.phoneNumber;
+          }
+        }
+
+        if (updates.name !== undefined && updates.name.trim()) {
+          if (slot === 'partnerA') {
+            coupleUpdates.partnerAName = updates.name.trim();
+          } else {
+            coupleUpdates.partnerBName = updates.name.trim();
+          }
+        }
+
+        if (updates.avatarUrl !== undefined) {
+          if (slot === 'partnerA') {
+            coupleUpdates.partnerAAvatar = updates.avatarUrl;
+          } else {
+            coupleUpdates.partnerBAvatar = updates.avatarUrl;
+          }
+        }
+
+        if (updates.city !== undefined) {
+          if (slot === 'partnerA') {
+            coupleUpdates.partnerACity = updates.city;
+          } else {
+            coupleUpdates.partnerBCity = updates.city;
+          }
+        }
+
+        if (updates.location !== undefined) {
+          if (slot === 'partnerA') {
+            coupleUpdates.partnerALocation = updates.location;
+          } else {
+            coupleUpdates.partnerBLocation = updates.location;
+          }
+        }
+
+        if (updates.shareLocation !== undefined) {
+          if (slot === 'partnerA') {
+            coupleUpdates.partnerAShareLocation = updates.shareLocation;
+          } else {
+            coupleUpdates.partnerBShareLocation = updates.shareLocation;
+          }
+        }
+
+        if (Object.keys(coupleUpdates).length > 1) {
+          const updatedCouple = { ...couple, ...coupleUpdates };
+          setCouple(updatedCouple);
+          saveAndBroadcast({ couple: updatedCouple });
+          syncCoupleToFirestore(updatedCouple);
         }
       }
     },
-    [activeUserId, couple, saveAndBroadcast, userA, userB]
+    [currentUser.id, userA, userB, couple, firebaseUser, saveAndBroadcast]
   );
 
   const updateCouple = useCallback(
@@ -1884,9 +1982,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               location: newLocation,
             });
             if (coupleRef.current) {
+              const slot = getCoupleSlot(targetUserId, coupleRef.current);
               syncPartnerLocationToFirestore(
                 coupleRef.current.id,
-                'partnerA',
+                slot,
                 newLocation,
                 true,
                 cleanCityName
@@ -1906,9 +2005,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               location: newLocation,
             });
             if (coupleRef.current) {
+              const slot = getCoupleSlot(targetUserId, coupleRef.current);
               syncPartnerLocationToFirestore(
                 coupleRef.current.id,
-                'partnerB',
+                slot,
                 newLocation,
                 true,
                 cleanCityName
@@ -2029,7 +2129,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         saveAndBroadcast({ userA: updated });
         syncUserToFirestore(updated);
         if (couple) {
-          syncPartnerLocationToFirestore(couple.id, 'partnerA', newLocation, true, cleanCity);
+          const slot = getCoupleSlot(userA.id || firebaseUser?.uid, couple);
+          syncPartnerLocationToFirestore(couple.id, slot, newLocation, true, cleanCity);
         }
       } else {
         const updated = {
@@ -2042,12 +2143,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         saveAndBroadcast({ userB: updated });
         syncUserToFirestore(updated);
         if (couple) {
-          syncPartnerLocationToFirestore(couple.id, 'partnerB', newLocation, true, cleanCity);
+          const slot = getCoupleSlot(userB.id || firebaseUser?.uid, couple);
+          syncPartnerLocationToFirestore(couple.id, slot, newLocation, true, cleanCity);
         }
       }
       setLocationError(null);
     },
-    [activeUserId, couple, saveAndBroadcast, userA, userB]
+    [activeUserId, couple, firebaseUser?.uid, saveAndBroadcast, userA, userB]
   );
 
   const stopSharingLocation = useCallback(
@@ -2088,7 +2190,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         saveAndBroadcast({ userA: updated });
         syncUserToFirestore(updated);
         if (couple) {
-          syncPartnerLocationToFirestore(couple.id, 'partnerA', userA.location, false, userA.city);
+          const slot = getCoupleSlot(userA.id || firebaseUser?.uid, couple);
+          syncPartnerLocationToFirestore(couple.id, slot, userA.location, false, userA.city);
         }
       } else {
         const updated = { ...userB, shareLocation: false };
@@ -2096,11 +2199,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         saveAndBroadcast({ userB: updated });
         syncUserToFirestore(updated);
         if (couple) {
-          syncPartnerLocationToFirestore(couple.id, 'partnerB', userB.location, false, userB.city);
+          const slot = getCoupleSlot(userB.id || firebaseUser?.uid, couple);
+          syncPartnerLocationToFirestore(couple.id, slot, userB.location, false, userB.city);
         }
       }
     },
-    [activeUserId, couple, saveAndBroadcast, userA, userB]
+    [activeUserId, couple, firebaseUser?.uid, saveAndBroadcast, userA, userB]
   );
 
   const stopSharingEverything = useCallback(() => {
@@ -2109,10 +2213,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       location: undefined,
     });
     if (couple) {
-      const isTargetA = activeUserId === userA.id;
-      syncPartnerLocationToFirestore(couple.id, isTargetA ? 'partnerA' : 'partnerB', undefined, false);
+      const slot = getCoupleSlot(currentUser.id || firebaseUser?.uid, couple);
+      syncPartnerLocationToFirestore(couple.id, slot, undefined, false);
     }
-  }, [activeUserId, couple, updateUserProfile, userA.id]);
+  }, [couple, currentUser.id, firebaseUser?.uid, updateUserProfile]);
 
   // 13. Emergency Contacts
   const addEmergencyContact = useCallback(

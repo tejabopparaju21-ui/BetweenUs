@@ -639,13 +639,14 @@ export function listenToCoupleDoc(
  * Sync User Profile to Firestore
  */
 export async function syncUserToFirestore(user: UserProfile) {
-  if (!auth.currentUser || auth.currentUser.uid !== user.id) {
+  if (!auth.currentUser) {
     return;
   }
+  const uid = auth.currentUser.uid;
   try {
-    const userRef = doc(db, 'users', user.id);
-    await setDoc(userRef, sanitizeForFirestore({ ...user, uid: user.id }), { merge: true });
-    console.debug('Firestore: user profile synced', user.id);
+    const userRef = doc(db, 'users', uid);
+    await setDoc(userRef, sanitizeForFirestore({ ...user, id: uid, uid, updatedAt: new Date().toISOString() }), { merge: true });
+    console.debug('Firestore: user profile synced', uid);
   } catch (err) {
     console.warn('Firestore user sync notice:', err);
   }
