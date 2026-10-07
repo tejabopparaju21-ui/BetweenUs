@@ -527,7 +527,7 @@ export const SettingsSection: React.FC = () => {
                     type="text"
                     value={couple?.relationshipName || ''}
                     onChange={(e) => updateCouple({ relationshipName: e.target.value })}
-                    placeholder="Teja & Bhuvana Forever"
+                    placeholder={`${currentUser.name} & Partner Forever`}
                     className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200"
                   />
                 </div>

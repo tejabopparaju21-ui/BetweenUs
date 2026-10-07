@@ -41,6 +41,7 @@ import {
   unlinkCoupleInFirestore,
   getOrCreateUserProfile,
   getUserProfile,
+  getNameFromEmail,
   findCoupleForUser,
   ensureUserPendingCouple,
   markMessageAsReadInFirestore,
@@ -169,7 +170,7 @@ interface AppContextType {
   unlinkCurrentCouple: () => Promise<void>;
   loginWithGoogle: () => Promise<{ success: boolean; error?: string }>;
   loginWithEmail: (email: string, pass: string) => Promise<{ success: boolean; error?: string }>;
-  registerWithEmail: (email: string, pass: string) => Promise<{ success: boolean; error?: string }>;
+  registerWithEmail: (email: string, pass: string, name?: string) => Promise<{ success: boolean; error?: string }>;
   logOutFirebase: () => Promise<void>;
 }
 
@@ -770,6 +771,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
           // 1. Get or create personalized user profile from Firestore
           const profile = await getOrCreateUserProfile(u);
+
+          // Self-heal stale test name if email belongs to someone else
+          const isEmailTeja = (u.email || '').toLowerCase().startsWith('teja');
+          if ((!profile.name || profile.name === 'You' || (profile.name.toLowerCase() === 'teja' && !isEmailTeja)) && u.email) {
+            const derived = getNameFromEmail(u.email, u.displayName);
+            if (derived && derived !== 'You') {
+              profile.name = derived;
+              syncUserToFirestore(profile);
+            }
+          }
+
           setActiveUserId(u.uid);
           setUserA(profile);
 
@@ -802,6 +814,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (!userCouple) {
             // If no couple exists, ensure a pending couple space with their own personal code
             userCouple = await ensureUserPendingCouple(profile);
+          } else {
+            // Keep couple partner name in sync with user's genuine profile name
+            let coupleNeedsSync = false;
+            if (userCouple.partnerAId === u.uid && userCouple.partnerAName !== profile.name) {
+              userCouple.partnerAName = profile.name;
+              coupleNeedsSync = true;
+            } else if (userCouple.partnerBId === u.uid && userCouple.partnerBName !== profile.name) {
+              userCouple.partnerBName = profile.name;
+              coupleNeedsSync = true;
+            }
+            if (coupleNeedsSync) {
+              syncCoupleToFirestore(userCouple);
+            }
           }
           setCouple(userCouple);
 
@@ -2678,8 +2703,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return await fbLoginWithEmail(email, pass);
   }, []);
 
-  const registerWithEmail = useCallback(async (email: string, pass: string) => {
-    return await fbRegisterWithEmail(email, pass);
+  const registerWithEmail = useCallback(async (email: string, pass: string, name?: string) => {
+    return await fbRegisterWithEmail(email, pass, name);
   }, []);
 
   const logOutFirebase = useCallback(async () => {

@@ -15,6 +15,10 @@ export const Navigation: React.FC = () => {
   const {
     activeTab,
     setActiveTab,
+    currentUser,
+    partnerUser,
+    isDemoMode,
+    firebaseUser,
   } = useApp();
 
   const [isEmergencyOpen, setIsEmergencyOpen] = useState(false);
@@ -59,7 +63,13 @@ export const Navigation: React.FC = () => {
                 Between<span className="text-rose-600">Us</span>
               </span>
               <span className="text-[9px] sm:text-[10px] font-semibold text-rose-500/90 tracking-tight leading-tight mt-0.5 truncate">
-                starts with TEJA and AKHILA
+                {isDemoMode || !firebaseUser ? (
+                  'starts with TEJA and AKHILA'
+                ) : partnerUser?.name && partnerUser.name !== 'Partner' ? (
+                  `starts with ${currentUser.name.toUpperCase()} and ${partnerUser.name.toUpperCase()}`
+                ) : (
+                  `starts with ${currentUser.name.toUpperCase()}`
+                )}
               </span>
             </div>
           </button>

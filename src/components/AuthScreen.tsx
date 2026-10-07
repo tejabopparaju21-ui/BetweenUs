@@ -66,7 +66,7 @@ export const AuthScreen: React.FC = () => {
     setLoading(true);
     try {
       if (isRegister) {
-        const res = await registerWithEmail(email, password);
+        const res = await registerWithEmail(email, password, name);
         if (!res.success && res.error) {
           setError(res.error);
         }

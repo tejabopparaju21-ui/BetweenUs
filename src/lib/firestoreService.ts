@@ -22,6 +22,7 @@ import {
   signInAnonymously,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  updateProfile,
   signInWithPopup,
   signOut as fbSignOut,
   User as FirebaseUser,
@@ -74,9 +75,15 @@ export async function loginWithEmail(email: string, pass: string) {
   }
 }
 
-export async function registerWithEmail(email: string, pass: string) {
+export async function registerWithEmail(email: string, pass: string, name?: string) {
   try {
     const res = await createUserWithEmailAndPassword(auth, email, pass);
+    const resolvedName = name?.trim() || getNameFromEmail(email);
+    if (resolvedName && resolvedName !== 'You') {
+      try {
+        await updateProfile(res.user, { displayName: resolvedName });
+      } catch (_) {}
+    }
     return { success: true, user: res.user };
   } catch (err: any) {
     return { success: false, error: err.message };
@@ -215,18 +222,91 @@ export function generateCoupleCode(): string {
 }
 
 /**
+ * Format and derive a clean, pleasant display name from an email address or display name
+ */
+export function getNameFromEmail(email: string, displayName?: string | null): string {
+  const trimmedDisplay = displayName?.trim();
+  const isGeneric = !trimmedDisplay || ['you', 'user', 'partner', 'admin', 'test'].includes(trimmedDisplay.toLowerCase());
+
+  const cleanEmail = (email || '').trim().toLowerCase();
+  const isEmailTeja = cleanEmail.startsWith('teja');
+
+  // If displayName is non-generic and not a stale 'Teja' on a non-Teja email, use it
+  if (trimmedDisplay && !isGeneric) {
+    if (trimmedDisplay.toLowerCase() === 'teja' && !isEmailTeja) {
+      // Stale test name assigned to a different user - fall through to extract from email
+    } else {
+      return trimmedDisplay;
+    }
+  }
+
+  if (email && email.includes('@')) {
+    const localPart = email.split('@')[0].trim();
+    // Remove digits, replace dots, underscores, hyphens with spaces
+    let cleaned = localPart
+      .replace(/[._-]+/g, ' ')
+      .replace(/[0-9]+/g, '')
+      .trim();
+
+    // If removing numbers left nothing (e.g. "98490"), use original localPart
+    if (!cleaned) {
+      cleaned = localPart.replace(/[._-]+/g, ' ').trim();
+    }
+
+    if (cleaned) {
+      const formatted = cleaned
+        .split(/\s+/)
+        .filter(Boolean)
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+        .join(' ');
+      if (formatted) return formatted;
+    }
+  }
+
+  if (trimmedDisplay && !isGeneric) return trimmedDisplay;
+  return 'You';
+}
+
+/**
  * Get or create User Profile in Firestore
  */
 export async function getOrCreateUserProfile(firebaseUser: FirebaseUser): Promise<UserProfile> {
   const userRef = doc(db, 'users', firebaseUser.uid);
+  const derivedName = getNameFromEmail(firebaseUser.email || '', firebaseUser.displayName);
+
   try {
     const snap = await getDoc(userRef);
     if (snap.exists()) {
       const data = snap.data() as UserProfile;
+      let shouldUpdate = false;
+      const updates: Partial<UserProfile> = {};
+
       // Ensure coupleCode exists
       if (!data.coupleCode) {
         data.coupleCode = generateCoupleCode();
-        await setDoc(userRef, { coupleCode: data.coupleCode }, { merge: true });
+        updates.coupleCode = data.coupleCode;
+        shouldUpdate = true;
+      }
+
+      // Check if existing document had 'Teja' or 'You' mistakenly assigned while email is someone else
+      const isEmailTeja = (firebaseUser.email || data.email || '').toLowerCase().startsWith('teja');
+      const isCurrentNameStale = !data.name || data.name === 'You' || (data.name.toLowerCase() === 'teja' && !isEmailTeja);
+
+      if (isCurrentNameStale && derivedName && derivedName !== 'You') {
+        data.name = derivedName;
+        updates.name = derivedName;
+        shouldUpdate = true;
+      }
+
+      // Ensure email is stored on the profile
+      if (!data.email && firebaseUser.email) {
+        data.email = firebaseUser.email;
+        updates.email = firebaseUser.email;
+        shouldUpdate = true;
+      }
+
+      if (shouldUpdate) {
+        await setDoc(userRef, updates, { merge: true });
       }
       return data;
     }
@@ -239,7 +319,7 @@ export async function getOrCreateUserProfile(firebaseUser: FirebaseUser): Promis
   const newProfile: UserProfile = {
     id: firebaseUser.uid,
     uid: firebaseUser.uid,
-    name: firebaseUser.displayName || 'You',
+    name: derivedName,
     email: firebaseUser.email || '',
     avatarUrl: firebaseUser.photoURL || '/app-logo.svg',
     timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Kolkata',
@@ -381,7 +461,17 @@ export async function ensureUserPendingCouple(user: UserProfile): Promise<Couple
   try {
     const snap = await getDoc(coupleRef);
     if (snap.exists()) {
-      return snap.data() as Couple;
+      const existing = snap.data() as Couple;
+      const isEmailTeja = (user.email || '').toLowerCase().startsWith('teja');
+      const isNameStale = !existing.partnerAName || existing.partnerAName === 'You' || (existing.partnerAName.toLowerCase() === 'teja' && !isEmailTeja);
+      if (existing.partnerAId === user.id && isNameStale && user.name && user.name !== existing.partnerAName) {
+        existing.partnerAName = user.name;
+        if (existing.status === 'waiting_for_partner') {
+          existing.relationshipName = `${user.name}'s Haven`;
+        }
+        await setDoc(coupleRef, { partnerAName: user.name, relationshipName: existing.relationshipName }, { merge: true });
+      }
+      return existing;
     }
   } catch (err) {
     console.warn('ensureUserPendingCouple read notice:', err);
