@@ -5,6 +5,7 @@ import {
   collection,
   doc,
   setDoc,
+  updateDoc,
   getDoc,
   getDocs,
   deleteDoc,
@@ -1113,7 +1114,20 @@ export async function syncCallUpdatesToFirestore(
       }
     }
 
-    await setDoc(coupleRef, firestoreUpdates, { merge: true });
+    try {
+      await updateDoc(coupleRef, firestoreUpdates);
+    } catch (updateErr) {
+      // Fallback: If updateDoc fails (e.g. activeCall key not yet set on couple doc), use setDoc with nested activeCall
+      const sanitizedUpdates = sanitizeForFirestore(updates);
+      await setDoc(
+        coupleRef,
+        {
+          activeCall: sanitizedUpdates,
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true }
+      );
+    }
   } catch (err) {
     console.warn('syncCallUpdatesToFirestore notice:', err);
   }

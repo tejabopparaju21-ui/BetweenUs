@@ -46,7 +46,10 @@ const ICE_SERVERS: RTCConfiguration = {
     { urls: 'stun:stun4.l.google.com:19302' },
     { urls: 'stun:stun.cloudflare.com:3478' },
     { urls: 'stun:global.stun.twilio.com:3478' },
+    { urls: 'stun:stun.services.mozilla.com' },
+    { urls: 'stun:stun.sipgate.net:3478' },
   ],
+  iceCandidatePoolSize: 10,
 };
 
 /**
@@ -240,6 +243,37 @@ export const CallModal: React.FC = () => {
     return resolveCallRole(activeCall, myUid, mySessionId);
   }, [activeCall, myUid, mySessionId]);
 
+  const activeCallRef = useRef<CallSession | null>(activeCall);
+  activeCallRef.current = activeCall;
+
+  const updateCallSessionRef = useRef(updateCallSession);
+  updateCallSessionRef.current = updateCallSession;
+
+  const isCallerRef = useRef(isCaller);
+  isCallerRef.current = isCaller;
+
+  const isRecipientRef = useRef(isRecipient);
+  isRecipientRef.current = isRecipient;
+
+  const isSpeakerMutedRef = useRef(isSpeakerMuted);
+  isSpeakerMutedRef.current = isSpeakerMuted;
+
+  const currentCallIdRef = useRef<string | null>(null);
+
+  // Cleanly reset signaling & candidate trackers when starting a new call session
+  useEffect(() => {
+    if (activeCall?.id && activeCall.id !== currentCallIdRef.current) {
+      currentCallIdRef.current = activeCall.id;
+      offerCreatedRef.current = false;
+      answerCreatedRef.current = false;
+      localCandidatesRef.current = [];
+      pendingCandidatesRef.current = [];
+      queuedRemoteCandidatesRef.current = [];
+      appliedCandidatesRef.current.clear();
+      setHasRemoteVideo(false);
+    }
+  }, [activeCall?.id]);
+
   const mode = activeCall?.mode || 'voice';
   const status = activeCall?.status || 'ended';
 
@@ -352,26 +386,74 @@ export const CallModal: React.FC = () => {
     }
   }, [mode, isVideoOff, facingMode]);
 
-  // Keep remote video preview DOM element bound to remote stream
-  useEffect(() => {
-    if (remoteVideoRef.current && remoteStreamRef.current && hasRemoteVideo) {
-      if (remoteVideoRef.current.srcObject !== remoteStreamRef.current) {
-        remoteVideoRef.current.srcObject = remoteStreamRef.current;
-      }
-      remoteVideoRef.current.play().catch(() => {});
-    }
-  }, [hasRemoteVideo, isSwappedViews]);
+  // Helper to reliably attach and play remote audio and video tracks
+  const attachRemoteStream = useCallback(() => {
+    const stream = remoteStreamRef.current;
+    if (!stream) return;
 
-  // Keep remote audio DOM element bound to remote stream
-  useEffect(() => {
-    if (remoteAudioRef.current && remoteStreamRef.current) {
-      if (remoteAudioRef.current.srcObject !== remoteStreamRef.current) {
-        remoteAudioRef.current.srcObject = remoteStreamRef.current;
-      }
-      remoteAudioRef.current.muted = isSpeakerMuted;
-      remoteAudioRef.current.play().catch(() => {});
+    // Check if remote stream contains live video tracks
+    const videoTracks = stream.getVideoTracks();
+    if (videoTracks.length > 0 && videoTracks.some((t) => t.readyState === 'live')) {
+      setHasRemoteVideo(true);
     }
-  }, [isSpeakerMuted]);
+
+    if (remoteAudioRef.current) {
+      if (remoteAudioRef.current.srcObject !== stream) {
+        remoteAudioRef.current.srcObject = stream;
+      }
+      remoteAudioRef.current.muted = isSpeakerMutedRef.current;
+      remoteAudioRef.current.play().catch((err) => {
+        console.debug('Remote audio autoplay waiting for user interaction:', err);
+      });
+    }
+
+    if (remoteVideoRef.current && mode === 'video') {
+      if (remoteVideoRef.current.srcObject !== stream) {
+        remoteVideoRef.current.srcObject = stream;
+      }
+      remoteVideoRef.current.play().catch((err) => {
+        console.debug('Remote video autoplay waiting for user interaction:', err);
+      });
+    }
+  }, [mode]);
+
+  const unlockMediaPlayback = useCallback(() => {
+    try {
+      const ctx = getAudioContext();
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+      }
+    } catch (_) {}
+    attachRemoteStream();
+  }, [attachRemoteStream]);
+
+  // Keep remote media preview DOM elements bound to remote stream
+  useEffect(() => {
+    if (activeCall?.status === 'connected') {
+      attachRemoteStream();
+    }
+  }, [activeCall?.status, hasRemoteVideo, isSpeakerMuted, mode, attachRemoteStream]);
+
+  // Universal touch & click audio unlock for mobile and laptop browsers
+  useEffect(() => {
+    if (!activeCall || activeCall.status === 'ended' || activeCall.status === 'declined') return;
+
+    const handleUserInteraction = () => {
+      unlockMediaPlayback();
+    };
+
+    window.addEventListener('click', handleUserInteraction);
+    window.addEventListener('touchstart', handleUserInteraction, { passive: true });
+    window.addEventListener('pointerdown', handleUserInteraction, { passive: true });
+    window.addEventListener('keydown', handleUserInteraction);
+
+    return () => {
+      window.removeEventListener('click', handleUserInteraction);
+      window.removeEventListener('touchstart', handleUserInteraction);
+      window.removeEventListener('pointerdown', handleUserInteraction);
+      window.removeEventListener('keydown', handleUserInteraction);
+    };
+  }, [activeCall?.status, unlockMediaPlayback]);
 
   // -------------------------------------------------------------
   // 1. Ringtone & Audio Handling based on activeCall.status
@@ -433,33 +515,117 @@ export const CallModal: React.FC = () => {
   }, [activeCall?.status, activeCall?.connectedAt]);
 
   // ICE candidate collector with debouncing
-  const queueLocalCandidate = useCallback(
-    (candStr: string) => {
-      if (localCandidatesRef.current.includes(candStr)) return;
-      localCandidatesRef.current.push(candStr);
-      pendingCandidatesRef.current.push(candStr);
+  const queueLocalCandidate = useCallback((candStr: string) => {
+    if (localCandidatesRef.current.includes(candStr)) return;
+    localCandidatesRef.current.push(candStr);
+    pendingCandidatesRef.current.push(candStr);
 
-      if (candidateFlushTimeoutRef.current) {
-        clearTimeout(candidateFlushTimeoutRef.current);
+    if (candidateFlushTimeoutRef.current) {
+      clearTimeout(candidateFlushTimeoutRef.current);
+    }
+    candidateFlushTimeoutRef.current = setTimeout(() => {
+      if (pendingCandidatesRef.current.length > 0) {
+        const batch = [...pendingCandidatesRef.current];
+        pendingCandidatesRef.current = [];
+        if (isCallerRef.current) {
+          updateCallSessionRef.current({
+            iceCandidatesCaller: batch,
+          });
+        } else {
+          updateCallSessionRef.current({
+            iceCandidatesRecipient: batch,
+          });
+        }
       }
-      candidateFlushTimeoutRef.current = setTimeout(() => {
-        if (pendingCandidatesRef.current.length > 0) {
-          const batch = [...pendingCandidatesRef.current];
-          pendingCandidatesRef.current = [];
-          if (isCaller) {
-            updateCallSession({
-              iceCandidatesCaller: batch,
-            });
+    }, 100);
+  }, []);
+
+  // Helper to safely apply an incoming remote candidate to the PeerConnection
+  const applyCandidate = useCallback(async (candStr: string) => {
+    const pc = peerConnectionRef.current;
+    if (!pc || appliedCandidatesRef.current.has(candStr)) return;
+    try {
+      const candidateInit = JSON.parse(candStr);
+      await pc.addIceCandidate(candidateInit);
+      appliedCandidatesRef.current.add(candStr);
+    } catch (err) {
+      console.debug('Add ICE candidate notice:', err);
+    }
+  }, []);
+
+  // Helper to flush queued remote candidates once remote description is set
+  const flushQueuedCandidates = useCallback(async () => {
+    const candidatesToFlush = [...queuedRemoteCandidatesRef.current];
+    queuedRemoteCandidatesRef.current = [];
+    for (const candStr of candidatesToFlush) {
+      await applyCandidate(candStr);
+    }
+  }, [applyCandidate]);
+
+  // Centralized, race-condition-free WebRTC signaling processor
+  const processSignaling = useCallback(async () => {
+    const pc = peerConnectionRef.current;
+    const currentCall = activeCallRef.current;
+    if (!pc || !currentCall || currentCall.status !== 'connected') return;
+
+    const amCaller = isCallerRef.current;
+    const amRecipient = isRecipientRef.current;
+
+    // Recipient receives Offer and creates Answer
+    if (amRecipient && currentCall.sdpOffer && !answerCreatedRef.current) {
+      if (pc.signalingState === 'stable') {
+        try {
+          answerCreatedRef.current = true;
+          const offerDesc = new RTCSessionDescription(JSON.parse(currentCall.sdpOffer));
+          await pc.setRemoteDescription(offerDesc);
+          await flushQueuedCandidates();
+          attachRemoteStream();
+
+          const answer = await pc.createAnswer({
+            offerToReceiveAudio: true,
+            offerToReceiveVideo: mode === 'video',
+          });
+          await pc.setLocalDescription(answer);
+          await updateCallSessionRef.current({
+            sdpAnswer: JSON.stringify(answer),
+          });
+        } catch (err) {
+          console.debug('WebRTC recipient answer notice:', err);
+        }
+      }
+    }
+
+    // Caller receives Answer from recipient
+    if (amCaller && currentCall.sdpAnswer && pc.signalingState === 'have-local-offer') {
+      try {
+        const answerDesc = new RTCSessionDescription(JSON.parse(currentCall.sdpAnswer));
+        await pc.setRemoteDescription(answerDesc);
+        await flushQueuedCandidates();
+        attachRemoteStream();
+      } catch (err) {
+        console.debug('WebRTC caller apply answer notice:', err);
+      }
+    }
+
+    // Process remote ICE candidates
+    const remoteCandidates = amCaller
+      ? currentCall.iceCandidatesRecipient || []
+      : currentCall.iceCandidatesCaller || [];
+
+    if (remoteCandidates.length > 0) {
+      remoteCandidates.forEach((candStr) => {
+        if (!appliedCandidatesRef.current.has(candStr)) {
+          if (pc.remoteDescription && pc.remoteDescription.type) {
+            applyCandidate(candStr);
           } else {
-            updateCallSession({
-              iceCandidatesRecipient: batch,
-            });
+            if (!queuedRemoteCandidatesRef.current.includes(candStr)) {
+              queuedRemoteCandidatesRef.current.push(candStr);
+            }
           }
         }
-      }, 120);
-    },
-    [isCaller, updateCallSession]
-  );
+      });
+    }
+  }, [applyCandidate, flushQueuedCandidates, attachRemoteStream, mode]);
 
   // -------------------------------------------------------------
   // 3. Media Stream Acquisition & WebRTC PeerConnection
@@ -530,6 +696,14 @@ export const CallModal: React.FC = () => {
           } catch (_) {}
         }
 
+        // Close any lingering previous connection
+        if (peerConnectionRef.current) {
+          try {
+            peerConnectionRef.current.close();
+          } catch (_) {}
+          peerConnectionRef.current = null;
+        }
+
         // Setup WebRTC PeerConnection
         const pc = new RTCPeerConnection(ICE_SERVERS);
         peerConnectionRef.current = pc;
@@ -542,32 +716,54 @@ export const CallModal: React.FC = () => {
           pc.addTrack(track, stream);
         });
 
+        // Ensure both audio and video transceivers exist so remote tracks are always accepted
+        const transceivers = pc.getTransceivers();
+        if (!transceivers.some((t) => t.receiver.track.kind === 'audio')) {
+          pc.addTransceiver('audio', { direction: hasAudio ? 'sendrecv' : 'recvonly' });
+        }
+        if (mode === 'video') {
+          if (!transceivers.some((t) => t.receiver.track.kind === 'video')) {
+            pc.addTransceiver('video', { direction: hasVideo ? 'sendrecv' : 'recvonly' });
+          }
+        }
+
         // Remote track handler for incoming partner audio/video
         pc.ontrack = (event) => {
-          const track = event.track;
-          if (remoteStreamRef.current && !remoteStreamRef.current.getTracks().some((t) => t.id === track.id)) {
-            remoteStreamRef.current.addTrack(track);
+          if (!remoteStreamRef.current) {
+            remoteStreamRef.current = new MediaStream();
           }
 
-          if (track.kind === 'audio') {
-            if (remoteAudioRef.current) {
-              remoteAudioRef.current.srcObject = remoteStreamRef.current;
-              remoteAudioRef.current.muted = isSpeakerMuted;
-              remoteAudioRef.current.play().catch((err) => {
-                console.debug('Remote audio autoplay waiting for user interaction:', err);
-              });
-            }
+          if (event.streams && event.streams[0]) {
+            event.streams[0].getTracks().forEach((track) => {
+              if (!remoteStreamRef.current!.getTracks().some((t) => t.id === track.id)) {
+                remoteStreamRef.current!.addTrack(track);
+              }
+            });
           }
 
-          if (track.kind === 'video') {
+          if (!remoteStreamRef.current.getTracks().some((t) => t.id === event.track.id)) {
+            remoteStreamRef.current.addTrack(event.track);
+          }
+
+          if (event.track.kind === 'video') {
             setHasRemoteVideo(true);
-            if (remoteVideoRef.current) {
-              remoteVideoRef.current.srcObject = remoteStreamRef.current;
-              remoteVideoRef.current.play().catch((err) => {
-                console.debug('Remote video autoplay waiting for user interaction:', err);
-              });
-            }
+            event.track.onunmute = () => {
+              setHasRemoteVideo(true);
+              attachRemoteStream();
+            };
+            event.track.onended = () => {
+              setHasRemoteVideo(false);
+            };
           }
+
+          event.track.addEventListener('unmute', () => {
+            if (event.track.kind === 'video') {
+              setHasRemoteVideo(true);
+            }
+            attachRemoteStream();
+          });
+
+          attachRemoteStream();
         };
 
         // ICE candidate collector
@@ -581,6 +777,9 @@ export const CallModal: React.FC = () => {
         // Connection resilience
         pc.oniceconnectionstatechange = () => {
           console.debug('WebRTC ICE state:', pc.iceConnectionState);
+          if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+            attachRemoteStream();
+          }
           if (pc.iceConnectionState === 'failed') {
             try {
               pc.restartIce();
@@ -588,15 +787,33 @@ export const CallModal: React.FC = () => {
           }
         };
 
-        // Caller creates initial WebRTC Offer
-        if (isCaller && !offerCreatedRef.current && !activeCall.sdpOffer) {
+        pc.onconnectionstatechange = () => {
+          console.debug('WebRTC connection state:', pc.connectionState);
+          if (pc.connectionState === 'connected') {
+            attachRemoteStream();
+          }
+          if (pc.connectionState === 'failed') {
+            try {
+              pc.restartIce();
+            } catch (_) {}
+          }
+        };
+
+        // Caller creates initial WebRTC Offer with explicit media reception flags
+        if (isCaller && !offerCreatedRef.current && !activeCallRef.current?.sdpOffer) {
           offerCreatedRef.current = true;
-          const offer = await pc.createOffer();
+          const offer = await pc.createOffer({
+            offerToReceiveAudio: true,
+            offerToReceiveVideo: mode === 'video',
+          });
           await pc.setLocalDescription(offer);
-          await updateCallSession({
+          await updateCallSessionRef.current({
             sdpOffer: JSON.stringify(offer),
           });
         }
+
+        // Immediately process any existing signaling data (such as offer on recipient)
+        await processSignaling();
       } catch (err: any) {
         console.warn('Call setup error:', err);
       }
@@ -607,100 +824,22 @@ export const CallModal: React.FC = () => {
     return () => {
       isCancelled = true;
     };
-  }, [activeCall?.id, activeCall?.status, mode, isCaller, facingMode, queueLocalCandidate, updateCallSession, isSpeakerMuted]);
+  }, [activeCall?.id, activeCall?.status, mode, isCaller, facingMode, queueLocalCandidate, processSignaling, attachRemoteStream]);
 
   // -------------------------------------------------------------
   // 4. WebRTC Signaling Exchanges (Offer -> Answer -> Remote ICE)
   // -------------------------------------------------------------
   useEffect(() => {
-    if (!activeCall || activeCall.status !== 'connected' || !peerConnectionRef.current) {
+    if (!activeCall || activeCall.status !== 'connected') {
       return;
     }
-
-    const pc = peerConnectionRef.current;
-
-    // Helper to safely apply candidate
-    const applyCandidate = async (candStr: string) => {
-      if (appliedCandidatesRef.current.has(candStr)) return;
-      appliedCandidatesRef.current.add(candStr);
-      try {
-        const candidate = new RTCIceCandidate(JSON.parse(candStr));
-        await pc.addIceCandidate(candidate);
-      } catch (err) {
-        console.debug('Add ICE candidate notice:', err);
-      }
-    };
-
-    // Helper to flush queued remote candidates once remote description is set
-    const flushQueuedCandidates = async () => {
-      const candidatesToFlush = [...queuedRemoteCandidatesRef.current];
-      queuedRemoteCandidatesRef.current = [];
-      for (const candStr of candidatesToFlush) {
-        await applyCandidate(candStr);
-      }
-    };
-
-    // Recipient receives Offer and creates Answer
-    if (isRecipient && activeCall.sdpOffer && !answerCreatedRef.current && pc.signalingState === 'stable') {
-      const applyOfferAndAnswer = async () => {
-        try {
-          answerCreatedRef.current = true;
-          const offerDesc = new RTCSessionDescription(JSON.parse(activeCall.sdpOffer!));
-          await pc.setRemoteDescription(offerDesc);
-          await flushQueuedCandidates();
-
-          const answer = await pc.createAnswer();
-          await pc.setLocalDescription(answer);
-          await updateCallSession({
-            sdpAnswer: JSON.stringify(answer),
-          });
-        } catch (err) {
-          console.debug('WebRTC recipient answer notice:', err);
-        }
-      };
-      applyOfferAndAnswer();
-    }
-
-    // Caller receives Answer from recipient
-    if (isCaller && activeCall.sdpAnswer && pc.signalingState === 'have-local-offer') {
-      const applyAnswer = async () => {
-        try {
-          const answerDesc = new RTCSessionDescription(JSON.parse(activeCall.sdpAnswer!));
-          await pc.setRemoteDescription(answerDesc);
-          await flushQueuedCandidates();
-        } catch (err) {
-          console.debug('WebRTC caller apply answer notice:', err);
-        }
-      };
-      applyAnswer();
-    }
-
-    // Process remote ICE candidates
-    const remoteCandidates = isCaller
-      ? activeCall.iceCandidatesRecipient || []
-      : activeCall.iceCandidatesCaller || [];
-
-    if (remoteCandidates.length > 0) {
-      remoteCandidates.forEach((candStr) => {
-        if (!appliedCandidatesRef.current.has(candStr)) {
-          if (pc.remoteDescription && pc.remoteDescription.type) {
-            applyCandidate(candStr);
-          } else {
-            if (!queuedRemoteCandidatesRef.current.includes(candStr)) {
-              queuedRemoteCandidatesRef.current.push(candStr);
-            }
-          }
-        }
-      });
-    }
+    processSignaling();
   }, [
     activeCall?.sdpOffer,
     activeCall?.sdpAnswer,
     activeCall?.iceCandidatesCaller,
     activeCall?.iceCandidatesRecipient,
-    isCaller,
-    isRecipient,
-    updateCallSession,
+    processSignaling,
   ]);
 
   // -------------------------------------------------------------
@@ -884,10 +1023,11 @@ export const CallModal: React.FC = () => {
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (remoteAudioRef.current) {
-                      remoteAudioRef.current.play().catch(() => {});
-                    }
+                    unlockMediaPlayback();
                     acceptIncomingCall();
+                  }}
+                  onTouchStart={() => {
+                    unlockMediaPlayback();
                   }}
                   className="relative z-10 w-20 h-20 rounded-full bg-gradient-to-tr from-emerald-500 via-teal-500 to-emerald-400 hover:from-emerald-600 hover:to-teal-600 text-white flex items-center justify-center shadow-2xl shadow-emerald-500/60 ring-4 ring-emerald-400/50 transition active:scale-90 cursor-pointer tap-bounce animate-bounce"
                   title="Lift Call"
@@ -1074,7 +1214,22 @@ export const CallModal: React.FC = () => {
                   ref={remoteVideoRef}
                   autoPlay
                   playsInline
-                  className={`w-full h-full object-cover ${hasRemoteVideo ? 'block' : 'hidden'}`}
+                  muted
+                  onLoadedMetadata={() => {
+                    setHasRemoteVideo(true);
+                    if (remoteVideoRef.current) {
+                      remoteVideoRef.current.play().catch(() => {});
+                    }
+                  }}
+                  onPlay={() => {
+                    setHasRemoteVideo(true);
+                  }}
+                  onPlaying={() => {
+                    setHasRemoteVideo(true);
+                  }}
+                  className={`w-full h-full object-cover transition-opacity duration-300 ${
+                    hasRemoteVideo ? 'opacity-100' : 'opacity-0 pointer-events-none'
+                  }`}
                 />
 
                 {/* Romantic Avatar Fallback while ringing or if partner camera is off */}
@@ -1343,19 +1498,25 @@ export const CallModal: React.FC = () => {
 
   return (
     <div
-      onClick={() => {
-        if (remoteAudioRef.current) {
-          remoteAudioRef.current.play().catch(() => {});
-        }
-      }}
+      onClick={unlockMediaPlayback}
+      onTouchStart={unlockMediaPlayback}
       className="contents"
     >
-      {/* Permanent audio element for real-time remote audio in voice and video calls */}
+      {/* Permanent, active audio element for real-time remote partner audio in voice and video calls */}
       <audio
         ref={remoteAudioRef}
         autoPlay
         playsInline
-        style={{ position: 'fixed', top: -9999, left: -9999, width: 1, height: 1, opacity: 0.01, pointerEvents: 'none' }}
+        style={{
+          position: 'fixed',
+          bottom: -100,
+          left: -100,
+          width: '1px',
+          height: '1px',
+          opacity: 0.001,
+          pointerEvents: 'none',
+        }}
+        aria-hidden="true"
       />
       {renderModalBody()}
     </div>

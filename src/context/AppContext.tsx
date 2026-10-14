@@ -2549,13 +2549,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const acceptIncomingCall = useCallback(async () => {
     // Only permit explicit answering when status is actively ringing
-    if (!activeCall || activeCall.status !== 'ringing') return;
+    const current = activeCallRef.current || activeCall;
+    if (!current || current.status !== 'ringing') return;
     const updated: CallSession = {
-      ...activeCall,
+      ...current,
       status: 'connected',
       connectedAt: new Date().toISOString(),
     };
 
+    activeCallRef.current = updated;
     setActiveCall(updated);
     saveAndBroadcast({ activeCall: updated });
 
@@ -2572,14 +2574,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [activeCall, couple?.id, broadcastChannel, saveAndBroadcast]);
 
   const declineIncomingCall = useCallback(async () => {
-    if (!activeCall) return;
+    const current = activeCallRef.current || activeCall;
+    if (!current) return;
     const updated: CallSession = {
-      ...activeCall,
+      ...current,
       status: 'declined',
       endedAt: new Date().toISOString(),
       endedBy: currentUser.id,
     };
 
+    activeCallRef.current = updated;
     setActiveCall(updated);
     saveAndBroadcast({ activeCall: updated });
 
@@ -2596,6 +2600,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // Automatically clear call session after 2 seconds
     setTimeout(async () => {
+      activeCallRef.current = null;
       setActiveCall(null);
       saveAndBroadcast({ activeCall: null });
       if (couple?.id) {
