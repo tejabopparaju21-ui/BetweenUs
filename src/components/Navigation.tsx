@@ -62,8 +62,8 @@ export const Navigation: React.FC = () => {
               <span className="font-black text-base sm:text-lg tracking-tight text-slate-900 group-hover:text-rose-600 transition-colors leading-none">
                 Between<span className="text-rose-600">Us</span>
               </span>
-              <span className="font-black text-xs sm:text-sm tracking-wide text-rose-600 uppercase leading-tight mt-0.5">
-                TEJA and AKHILA
+              <span className="font-bold text-[10px] sm:text-xs tracking-wider text-rose-600 uppercase leading-tight mt-0.5">
+                For True Hearts Only
               </span>
             </div>
           </button>

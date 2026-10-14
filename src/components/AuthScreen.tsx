@@ -105,7 +105,7 @@ export const AuthScreen: React.FC = () => {
           Between<span className="text-rose-600">Us</span>
         </h1>
         <p className="text-sm sm:text-base font-black text-rose-600 uppercase tracking-wider mt-1">
-          TEJA and AKHILA
+          For True Hearts Only
         </p>
         <p className="text-xs sm:text-sm font-semibold text-rose-600 mt-1">
           Your Private Long-Distance Haven
@@ -438,7 +438,7 @@ export const AuthScreen: React.FC = () => {
           Protected by Google Firebase Authentication & Cloud Firestore.
         </p>
         <p className="text-[10px] font-bold text-rose-500 mt-1">
-          BetweenUs • starts with TEJA and AKHILA
+          BetweenUs • For True Hearts Only
         </p>
       </div>
     </div>
