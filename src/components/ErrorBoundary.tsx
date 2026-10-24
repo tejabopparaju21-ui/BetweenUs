@@ -26,8 +26,8 @@ export class ErrorBoundary extends Component<Props, State> {
 
   private handleReset = () => {
     try {
-      // Clear any corrupted transient call/modal cache if needed
-      sessionStorage.removeItem('betweenus_call_session_id');
+      sessionStorage.clear();
+      localStorage.removeItem('betweenus_demo_mode');
     } catch (_) {}
     window.location.reload();
   };

@@ -551,6 +551,30 @@ const DEFAULT_NOTIFICATIONS: AppNotification[] = [
 ];
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [isDemoMode, setIsDemoMode] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('betweenus_demo_mode') === 'true';
+    }
+    return false;
+  });
+
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
+
+  const enterDemoMode = useCallback(() => {
+    setIsDemoMode(true);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('betweenus_demo_mode', 'true');
+    }
+  }, []);
+
+  const exitDemoMode = useCallback(() => {
+    setIsDemoMode(false);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('betweenus_demo_mode');
+    }
+  }, []);
+
   // Active User State (Teja or Akhila) - scoped per device/browser session
   const [activeUserId, setActiveUserId] = useState<string>(() => {
     if (typeof window !== 'undefined') {
@@ -590,30 +614,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     senderName: string;
     id: number;
   } | null>(null);
-
-  const [isDemoMode, setIsDemoMode] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('betweenus_demo_mode') === 'true';
-    }
-    return false;
-  });
-
-  const enterDemoMode = useCallback(() => {
-    setIsDemoMode(true);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('betweenus_demo_mode', 'true');
-    }
-  }, []);
-
-  const exitDemoMode = useCallback(() => {
-    setIsDemoMode(false);
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('betweenus_demo_mode');
-    }
-  }, []);
-
-  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
-  const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
 
   const isPartnerPaired = useMemo(() => {
     if (isDemoMode) return true;

@@ -260,10 +260,10 @@ export const HomeDashboard: React.FC = () => {
             <span className="text-rose-500">❤️</span>
           </h2>
           <p className="text-[11px] sm:text-xs text-slate-600 font-bold">
-            {isPartnerPaired && partnerUser.name
+            {isPartnerPaired && partnerUser?.name
               ? (bothShareLocation
-                  ? `${distanceKm.toLocaleString()} km apart • ${currentUser.name.toUpperCase()} & ${partnerUser.name.toUpperCase()} ❤️`
-                  : `${currentUser.name.toUpperCase()} & ${partnerUser.name.toUpperCase()} • Connected heart to heart ❤️`)
+                  ? `${distanceKm.toLocaleString()} km apart • ${(currentUser?.name || 'YOU').toUpperCase()} & ${(partnerUser?.name || 'PARTNER').toUpperCase()} ❤️`
+                  : `${(currentUser?.name || 'YOU').toUpperCase()} & ${(partnerUser?.name || 'PARTNER').toUpperCase()} • Connected heart to heart ❤️`)
               : (isDemoMode
                   ? (bothShareLocation
                       ? `${distanceKm.toLocaleString()} km apart • TEJA & AKHILA ❤️`
