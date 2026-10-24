@@ -23,7 +23,6 @@ import {
   Sparkles,
   MessageCircle,
   ChevronRight,
-  ShieldCheck,
   Send,
   Eye,
   Flame,
@@ -217,7 +216,7 @@ export const HomeDashboard: React.FC = () => {
   };
 
   return (
-    <div className="max-w-md mx-auto px-4 py-5 space-y-5 pb-24 relative">
+    <div className="w-full max-w-md sm:max-w-xl md:max-w-2xl lg:max-w-3xl mx-auto px-3.5 sm:px-4 py-4 sm:py-5 space-y-4 sm:space-y-5 pb-24 relative">
       {/* Quick Love Float Animation Banner */}
       {quickLoveBurst && (
         <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 pointer-events-none animate-heart-float flex flex-col items-center">
@@ -592,162 +591,6 @@ export const HomeDashboard: React.FC = () => {
                 View Map ↗
               </button>
             </div>
-          </div>
-        </div>
-
-        {/* Quick Actions 2-Column Mobile Grid */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between px-1">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
-              <span>⚡</span>
-              <span>Quick Actions</span>
-            </span>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2.5">
-            {/* 1. Send Message */}
-            <button
-              type="button"
-              onClick={() => setActiveTab('chat')}
-              className="p-3.5 rounded-2xl bg-white hover:bg-rose-50/50 border border-rose-100 shadow-2xs text-left transition tap-bounce group cursor-pointer flex flex-col justify-between min-h-[74px]"
-            >
-              <div className="flex items-center justify-between">
-                <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center group-hover:scale-110 transition">
-                  <MessageCircle className="w-4 h-4" />
-                </div>
-                <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded-md">Chat</span>
-              </div>
-              <div>
-                <div className="font-extrabold text-xs text-slate-800">Send Message</div>
-                <div className="text-[10px] text-slate-400 truncate">Private messenger</div>
-              </div>
-            </button>
-
-            {/* 2. Video Call */}
-            <button
-              type="button"
-              onClick={() => startCall('video')}
-              className="p-3.5 rounded-2xl bg-gradient-to-br from-rose-50/90 via-pink-50/60 to-white hover:from-rose-100/90 border border-rose-200/90 shadow-2xs text-left transition tap-bounce group cursor-pointer flex flex-col justify-between min-h-[74px]"
-            >
-              <div className="flex items-center justify-between">
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-rose-500 to-pink-500 text-white flex items-center justify-center group-hover:scale-110 transition shadow-xs shadow-rose-500/30">
-                  <Video className="w-4 h-4" />
-                </div>
-                <span className="text-[10px] font-bold text-rose-700 bg-rose-100/80 px-1.5 py-0.5 rounded-md">Live HD</span>
-              </div>
-              <div>
-                <div className="font-extrabold text-xs text-slate-800">Video Call</div>
-                <div className="text-[10px] text-rose-600 font-semibold truncate">Phone & Laptop</div>
-              </div>
-            </button>
-
-            {/* 3. Voice Call */}
-            <button
-              type="button"
-              onClick={() => startCall('voice')}
-              className="p-3.5 rounded-2xl bg-white hover:bg-rose-50/50 border border-rose-100 shadow-2xs text-left transition tap-bounce group cursor-pointer flex flex-col justify-between min-h-[74px]"
-            >
-              <div className="flex items-center justify-between">
-                <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center group-hover:scale-110 transition border border-rose-200/60">
-                  <Phone className="w-4 h-4" />
-                </div>
-                <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded-md">Voice</span>
-              </div>
-              <div>
-                <div className="font-extrabold text-xs text-slate-800">Voice Call</div>
-                <div className="text-[10px] text-slate-400 truncate">Clear audio stream</div>
-              </div>
-            </button>
-
-            {/* 4. Live Location */}
-            <button
-              type="button"
-              onClick={() => setShowLocationDialog(true)}
-              className="p-3.5 rounded-2xl bg-white hover:bg-rose-50/50 border border-rose-100 shadow-2xs text-left transition tap-bounce group cursor-pointer flex flex-col justify-between min-h-[74px]"
-            >
-              <div className="flex items-center justify-between">
-                <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition">
-                  <MapPin className="w-4 h-4" />
-                </div>
-                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-md">GPS</span>
-              </div>
-              <div>
-                <div className="font-extrabold text-xs text-slate-800">Live Location</div>
-                <div className="text-[10px] text-slate-400 truncate">{bothShareLocation ? `${distanceKm} km radar` : 'Manage sharing'}</div>
-              </div>
-            </button>
-
-            {/* 3. Couple Games */}
-            <button
-              type="button"
-              onClick={() => setActiveTab('connect')}
-              className="p-3.5 rounded-2xl bg-white hover:bg-rose-50/50 border border-rose-100 shadow-2xs text-left transition tap-bounce group cursor-pointer flex flex-col justify-between min-h-[74px]"
-            >
-              <div className="flex items-center justify-between">
-                <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center group-hover:scale-110 transition">
-                  <Heart className="w-4 h-4 fill-purple-600" />
-                </div>
-                <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded-md">Fun</span>
-              </div>
-              <div>
-                <div className="font-extrabold text-xs text-slate-800">Couple Games</div>
-                <div className="text-[10px] text-slate-400 truncate">Quizzes & Truth/Dare</div>
-              </div>
-            </button>
-
-            {/* 4. Add Memory */}
-            <button
-              type="button"
-              onClick={() => setActiveTab('memories')}
-              className="p-3.5 rounded-2xl bg-white hover:bg-rose-50/50 border border-rose-100 shadow-2xs text-left transition tap-bounce group cursor-pointer flex flex-col justify-between min-h-[74px]"
-            >
-              <div className="flex items-center justify-between">
-                <div className="w-8 h-8 rounded-xl bg-pink-50 text-pink-600 flex items-center justify-center group-hover:scale-110 transition">
-                  <Calendar className="w-4 h-4" />
-                </div>
-                <span className="text-[10px] font-bold text-pink-700 bg-pink-50 px-1.5 py-0.5 rounded-md">Story</span>
-              </div>
-              <div>
-                <div className="font-extrabold text-xs text-slate-800">Add Memory</div>
-                <div className="text-[10px] text-slate-400 truncate">Photos & milestones</div>
-              </div>
-            </button>
-
-            {/* 5. Couple Games & Quiz */}
-            <button
-              type="button"
-              onClick={() => setActiveTab('connect')}
-              className="p-3.5 rounded-2xl bg-white hover:bg-rose-50/50 border border-rose-100 shadow-2xs text-left transition tap-bounce group cursor-pointer flex flex-col justify-between min-h-[74px]"
-            >
-              <div className="flex items-center justify-between">
-                <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center group-hover:scale-110 transition">
-                  <Sparkles className="w-4 h-4" />
-                </div>
-                <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-md">Quiz</span>
-              </div>
-              <div>
-                <div className="font-extrabold text-xs text-slate-800">Couple Quiz</div>
-                <div className="text-[10px] text-slate-400 truncate">Fun questions & prompts</div>
-              </div>
-            </button>
-
-            {/* 6. Emergency SOS */}
-            <button
-              type="button"
-              onClick={() => setShowLocationDialog(true)}
-              className="p-3.5 rounded-2xl bg-red-50/60 hover:bg-red-50 border border-red-200/80 shadow-2xs text-left transition tap-bounce group cursor-pointer flex flex-col justify-between min-h-[74px]"
-            >
-              <div className="flex items-center justify-between">
-                <div className="w-8 h-8 rounded-xl bg-red-100 text-red-600 flex items-center justify-center group-hover:scale-110 transition">
-                  <ShieldCheck className="w-4 h-4" />
-                </div>
-                <span className="text-[10px] font-bold text-red-700 bg-red-100 px-1.5 py-0.5 rounded-md">Safety</span>
-              </div>
-              <div>
-                <div className="font-extrabold text-xs text-red-900">Safety & SOS</div>
-                <div className="text-[10px] text-red-600 truncate">Emergency center</div>
-              </div>
-            </button>
           </div>
         </div>
 
