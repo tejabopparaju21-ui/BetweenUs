@@ -3,7 +3,8 @@
   "description": "A private, warm, and secure digital sanctuary for long-distance couples to chat, share moods, track distance, plan virtual dates, and cherish memories together.",
   "requestFramePermissions": [
     "geolocation",
-    "microphone"
+    "microphone",
+    "camera"
   ],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

@@ -25,6 +25,8 @@ export const ConnectSection: React.FC = () => {
   const {
     currentUser,
     partnerUser,
+    isPartnerPaired,
+    isDemoMode,
     couple,
     sharedNotes,
     saveSharedNote,
@@ -166,7 +168,7 @@ export const ConnectSection: React.FC = () => {
       addedByName: currentUser.name,
       title: songTitle.trim(),
       artist: songArtist.trim(),
-      dedicationNote: songNote.trim() || `Dedicated with love to ${partnerUser.name}`,
+      dedicationNote: songNote.trim() || (isPartnerPaired && partnerUser.name ? `Dedicated with love to ${partnerUser.name}` : 'Dedicated with love'),
       audioSampleUrl: 'https://cdn.freesound.org/previews/530/530415_11861866-lq.mp3',
       coverUrl: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=400&q=80',
     });
@@ -386,7 +388,7 @@ export const ConnectSection: React.FC = () => {
                 {/* Partner answer status */}
                 <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100 text-xs">
                   <div className="font-bold text-slate-800 flex items-center justify-between">
-                    <span>{partnerUser.name}'s Answer:</span>
+                    <span>{isPartnerPaired && partnerUser.name ? `${partnerUser.name}'s Answer:` : "Partner's Answer:"}</span>
                     {gameSession.answers[gameSession.currentIndex]?.[partnerUser.id] ? (
                       <span className="text-emerald-600 flex items-center gap-1">
                         <CheckCircle2 className="w-3.5 h-3.5" /> Revealed
@@ -401,7 +403,7 @@ export const ConnectSection: React.FC = () => {
                     </p>
                   ) : (
                     <p className="text-[11px] text-slate-400 mt-1">
-                      (Switch to {partnerUser.name} via top bar to simulate their turn)
+                      {isDemoMode ? `(Switch to ${partnerUser.name} via top bar to simulate their turn)` : `(Waiting for ${isPartnerPaired && partnerUser.name ? partnerUser.name : 'partner'} to answer)`}
                     </p>
                   )}
                 </div>
@@ -486,7 +488,7 @@ export const ConnectSection: React.FC = () => {
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-slate-500">
                           {isMine
-                            ? `Waiting for ${partnerUser.name} to unlock this`
+                            ? (isPartnerPaired && partnerUser.name ? `Waiting for ${partnerUser.name} to unlock this` : 'Waiting for partner to unlock this')
                             : 'Locked until you need it!'}
                         </span>
                         {!isMine && (
@@ -852,7 +854,7 @@ export const ConnectSection: React.FC = () => {
           Between<span className="text-rose-600">Us</span>
         </p>
         <p className="text-[11px] font-bold text-rose-500 mt-0.5">
-          starts with TEJA and AKHILA
+          starts with {isPartnerPaired && partnerUser.name ? `${currentUser.name} and ${partnerUser.name}` : (isDemoMode ? 'TEJA and AKHILA' : currentUser.name)}
         </p>
       </div>
     </div>

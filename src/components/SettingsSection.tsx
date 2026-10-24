@@ -45,6 +45,7 @@ export const SettingsSection: React.FC = () => {
   const {
     currentUser,
     partnerUser,
+    isPartnerPaired,
     couple,
     updateUserProfile,
     updateCouple,
@@ -347,7 +348,7 @@ export const SettingsSection: React.FC = () => {
         {/* User Name */}
         <h2 className="text-lg font-black tracking-tight">{currentUser.name}</h2>
         <p className="text-xs text-rose-100 mt-0.5 flex items-center justify-center gap-1 font-medium">
-          <span>Connected with {partnerUser.name}</span>
+          <span>{isPartnerPaired && partnerUser.name ? `Connected with ${partnerUser.name}` : 'Waiting for partner to connect'}</span>
           <Heart className="w-3 h-3 fill-rose-200 text-rose-200 inline" />
         </p>
 
@@ -597,7 +598,7 @@ export const SettingsSection: React.FC = () => {
             {profileSavedBadge && (
               <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-1.5 animate-fade-in">
                 <Check className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>Profile changes saved & synced with {partnerUser.name}!</span>
+                <span>Profile changes saved{isPartnerPaired && partnerUser.name ? ` & synced with ${partnerUser.name}` : ''}!</span>
               </div>
             )}
 
@@ -678,7 +679,7 @@ export const SettingsSection: React.FC = () => {
                 className="w-full text-xs px-3 py-2.5 rounded-xl border border-slate-200 font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-rose-400"
               />
               <p className="text-[10px] text-slate-500 mt-1 leading-relaxed">
-                Directly connected to {partnerUser.name}'s emergency ring button. During an emergency SOS, your partner's siren sounds and this phone number is dialed.
+                Directly connected to {isPartnerPaired && partnerUser.name ? `${partnerUser.name}'s` : "your partner's"} emergency ring button. During an emergency SOS, your partner's siren sounds and this phone number is dialed.
               </p>
             </div>
 
@@ -732,7 +733,7 @@ export const SettingsSection: React.FC = () => {
             {phoneSavedBadge && (
               <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-1.5 animate-fade-in">
                 <Check className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>Phone number saved! Directly connected to {partnerUser.name}'s emergency siren & dialer.</span>
+                <span>Phone number saved! Directly connected to {isPartnerPaired && partnerUser.name ? `${partnerUser.name}'s` : "your partner's"} emergency siren & dialer.</span>
               </div>
             )}
 
@@ -1489,7 +1490,7 @@ export const SettingsSection: React.FC = () => {
           Between<span className="text-rose-600">Us</span>
         </p>
         <p className="text-[11px] font-bold text-rose-500 mt-0.5">
-          starts with TEJA and AKHILA
+          starts with {isPartnerPaired && partnerUser.name ? `${currentUser.name} and ${partnerUser.name}` : (isDemoMode ? 'TEJA and AKHILA' : currentUser.name)}
         </p>
       </div>
     </div>

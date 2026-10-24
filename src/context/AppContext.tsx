@@ -273,6 +273,22 @@ const DEFAULT_USER_B: UserProfile = {
   currentMoodId: 'mood_2',
 };
 
+const UNPAIRED_PARTNER: UserProfile = {
+  id: '',
+  uid: '',
+  name: '',
+  email: '',
+  avatarUrl: '/app-logo.svg',
+  timeZone: 'Asia/Kolkata',
+  city: '',
+  country: 'IN',
+  anniversaryDate: '',
+  sleepStartHour: 23,
+  sleepEndHour: 7,
+  shareLocation: false,
+  emergencyContacts: [],
+};
+
 const DEFAULT_COUPLE: Couple = {
   id: 'couple_8829',
   code: 'LOVE-4821',
@@ -554,12 +570,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return 'user_teja_1';
   });
   const [userA, setUserA] = useState<UserProfile>(DEFAULT_USER_A);
-  const [userB, setUserB] = useState<UserProfile>(DEFAULT_USER_B);
-  const [couple, setCouple] = useState<Couple | null>(DEFAULT_COUPLE);
+  const [userB, setUserB] = useState<UserProfile>(() => (isDemoMode ? DEFAULT_USER_B : UNPAIRED_PARTNER));
+  const [couple, setCouple] = useState<Couple | null>(() => (isDemoMode ? DEFAULT_COUPLE : null));
   const [messages, setMessages] = useState<ChatMessage[]>(DEFAULT_MESSAGES);
-  const [moods, setMoods] = useState<MoodEntry[]>(DEFAULT_MOODS);
-  const [memories, setMemories] = useState<MemoryItem[]>(DEFAULT_MEMORIES);
-  const [events, setEvents] = useState<EventItem[]>(DEFAULT_EVENTS);
+  const [moods, setMoods] = useState<MoodEntry[]>(() => (isDemoMode ? DEFAULT_MOODS : []));
+  const [memories, setMemories] = useState<MemoryItem[]>(() => (isDemoMode ? DEFAULT_MEMORIES : []));
+  const [events, setEvents] = useState<EventItem[]>(() => (isDemoMode ? DEFAULT_EVENTS : []));
   const [virtualDates, setVirtualDates] = useState<VirtualDateIdea[]>(DEFAULT_VIRTUAL_DATES);
   const [sharedSongs, setSharedSongs] = useState<SharedSong[]>(DEFAULT_SONGS);
   const [sharedNotes, setSharedNotes] = useState<SharedNote[]>(DEFAULT_NOTES);
@@ -596,12 +612,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, []);
 
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
+
   const isPartnerPaired = useMemo(() => {
     if (isDemoMode) return true;
-    if (!couple) return false;
-    const hasPartnerB = !!couple.partnerBId && couple.partnerBId !== '';
-    return hasPartnerB && couple.status !== 'waiting_for_partner';
-  }, [isDemoMode, couple]);
+    if (!couple || !firebaseUser) return false;
+    const hasPartnerB = Boolean(couple.partnerBId && couple.partnerBId.trim() !== '');
+    const isDistinctPartners = couple.partnerAId !== couple.partnerBId;
+    const isMember = couple.partnerAId === firebaseUser.uid || couple.partnerBId === firebaseUser.uid;
+    return hasPartnerB && isDistinctPartners && isMember && couple.status === 'paired';
+  }, [isDemoMode, couple, firebaseUser]);
 
   // Broadcast channel for instantaneous cross-tab multi-window simulation
   const broadcastChannel = useMemo(() => {
@@ -661,48 +682,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, []);
 
-  // Load from localStorage on mount (preserving preferences, but Firestore is sole source for messages)
+  // Load from localStorage on mount only when in demo mode
   useEffect(() => {
+    if (!isDemoMode) return;
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
+      const saved = localStorage.getItem('betweenus_demo_state');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed.userA) {
-          if (!parsed.userA.avatarUrl || parsed.userA.avatarUrl.includes('photo-1534528741775-53994a69daeb')) {
-            parsed.userA.avatarUrl = '/app-logo.svg';
-          }
-          setUserA(parsed.userA);
-        }
-        if (parsed.userB) {
-          if (!parsed.userB.avatarUrl || parsed.userB.avatarUrl.includes('photo-1517841905240-472988babdf9')) {
-            parsed.userB.avatarUrl = '/app-logo.svg';
-          }
-          if (parsed.userB.name === 'Aanya' || !parsed.userB.name) {
-            parsed.userB.name = 'Akhila';
-          }
-          if (parsed.userB.email === 'aanya@example.com') {
-            parsed.userB.email = 'akhila@example.com';
-          }
-          if (parsed.userB.id === 'user_aanya_2') {
-            parsed.userB.id = 'user_akhila_2';
-          }
-          setUserB(parsed.userB);
-        }
-        if (parsed.couple !== undefined && parsed.couple) {
-          if (parsed.couple.partnerBName === 'Aanya') {
-            parsed.couple.partnerBName = 'Akhila';
-          }
-          if (parsed.couple.relationshipName?.includes('Aanya')) {
-            parsed.couple.relationshipName = parsed.couple.relationshipName.replace('Aanya', 'Akhila');
-          }
-          if (parsed.couple.partnerBId === 'user_aanya_2') {
-            parsed.couple.partnerBId = 'user_akhila_2';
-          }
-          setCouple(parsed.couple);
-        }
-        if (parsed.messages && Array.isArray(parsed.messages) && parsed.messages.length > 0) {
-          setMessages(parsed.messages);
-        }
+        if (parsed.userA) setUserA(parsed.userA);
+        if (parsed.userB) setUserB(parsed.userB);
+        if (parsed.couple !== undefined && parsed.couple) setCouple(parsed.couple);
+        if (parsed.messages && Array.isArray(parsed.messages) && parsed.messages.length > 0) setMessages(parsed.messages);
         if (parsed.moods) setMoods(parsed.moods);
         if (parsed.memories) setMemories(parsed.memories);
         if (parsed.events) setEvents(parsed.events);
@@ -714,13 +704,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (parsed.gameSession) setGameSession(parsed.gameSession);
       }
     } catch (e) {
-      console.error('Failed to load local state:', e);
+      console.error('Failed to load demo local state:', e);
     }
-  }, []);
+  }, [isDemoMode]);
 
-  // Firebase Auth State
-  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
-  const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
   const [pendingInviteCode, setPendingInviteCode] = useState<string | null>(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
@@ -831,51 +818,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           }
           setCouple(userCouple);
 
-          // 4. Resolve partner profile if paired
+          // 4. Resolve partner profile from their own authenticated profile if paired
           const partnerUid = userCouple.partnerAId === u.uid ? userCouple.partnerBId : userCouple.partnerAId;
-          const isCurrentTeja = (profile.name || '').toLowerCase() === 'teja';
-          const expectedPartnerName = isCurrentTeja ? 'Akhila' : 'Teja';
-          const expectedPartnerCity = isCurrentTeja ? 'Bengaluru' : 'Hyderabad';
+          const isPaired = Boolean(userCouple.status === 'paired' && partnerUid && partnerUid !== u.uid);
 
-          if (partnerUid && partnerUid !== u.uid) {
+          if (isPaired) {
             const partnerProfile = await getUserProfile(partnerUid);
             if (partnerProfile) {
-              // Self-heal duplicate names
-              if (partnerProfile.name.toLowerCase() === profile.name.toLowerCase()) {
-                partnerProfile.name = expectedPartnerName;
-                partnerProfile.city = expectedPartnerCity;
-              }
               setUserB(partnerProfile);
             } else {
-              let fallbackName = (userCouple.partnerAId === u.uid ? userCouple.partnerBName : userCouple.partnerAName);
-              if (!fallbackName || fallbackName.toLowerCase() === profile.name.toLowerCase() || fallbackName === 'Partner') {
-                fallbackName = expectedPartnerName;
-              }
-              setUserB((prev) => ({
-                ...prev,
+              const fallbackName = (userCouple.partnerAId === u.uid ? userCouple.partnerBName : userCouple.partnerAName) || 'Partner';
+              setUserB({
+                ...UNPAIRED_PARTNER,
                 id: partnerUid,
                 uid: partnerUid,
                 name: fallbackName,
-                city: fallbackName === 'Akhila' ? 'Bengaluru' : 'Hyderabad',
-              }));
+              });
             }
           } else {
-            // Partner slot waiting to be linked - initialize with distinct partner (Akhila or Teja)
-            setUserB({
-              id: isCurrentTeja ? 'user_akhila_2' : 'user_teja_1',
-              uid: isCurrentTeja ? 'user_akhila_2' : 'user_teja_1',
-              name: expectedPartnerName,
-              email: isCurrentTeja ? 'akhila@betweenus.love' : 'teja@betweenus.love',
-              city: expectedPartnerCity,
-              country: 'IN',
-              avatarUrl: '/app-logo.svg',
-              timeZone: 'Asia/Kolkata',
-              anniversaryDate: userCouple.anniversaryDate || new Date().toISOString().split('T')[0],
-              sleepStartHour: 23,
-              sleepEndHour: 7,
-              shareLocation: true,
-              emergencyContacts: [],
-            });
+            // Partner slot waiting to be linked
+            setUserB(UNPAIRED_PARTNER);
           }
         } else {
           if (isDemoMode) {
@@ -953,52 +915,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // 2. Listen to Couple document updates (partner joining or profile updates & live location)
     const unsubCouple = listenToCoupleDoc(couple.id, async (cloudCouple) => {
       if (cloudCouple) {
-        // Self-heal duplicate or missing partner names in cloud couple doc
-        if (
-          cloudCouple.partnerAName &&
-          cloudCouple.partnerBName &&
-          cloudCouple.partnerAName.toLowerCase() === cloudCouple.partnerBName.toLowerCase()
-        ) {
-          cloudCouple.partnerAName = 'Teja';
-          cloudCouple.partnerBName = 'Akhila';
-          cloudCouple.relationshipName = 'Teja & Akhila';
-          syncCoupleToFirestore(cloudCouple);
-        }
-
         setCouple((prev) => (prev ? { ...prev, ...cloudCouple } : cloudCouple));
+        const isPaired = Boolean(cloudCouple.status === 'paired' && cloudCouple.partnerBId && cloudCouple.partnerAId !== cloudCouple.partnerBId);
         const partnerUid = cloudCouple.partnerAId === firebaseUser.uid ? cloudCouple.partnerBId : cloudCouple.partnerAId;
-        const isCurrentTeja = (userARef.current.name || '').toLowerCase() === 'teja';
-        const expectedPartnerName = isCurrentTeja ? 'Akhila' : 'Teja';
-        const expectedPartnerCity = isCurrentTeja ? 'Bengaluru' : 'Hyderabad';
 
-        if (partnerUid && partnerUid !== firebaseUser.uid) {
+        if (isPaired && partnerUid && partnerUid !== firebaseUser.uid) {
           const partnerProfile = await getUserProfile(partnerUid);
           if (partnerProfile) {
-            if (partnerProfile.name.toLowerCase() === userARef.current.name.toLowerCase()) {
-              partnerProfile.name = expectedPartnerName;
-              partnerProfile.city = expectedPartnerCity;
-            }
             setUserB(partnerProfile);
           } else {
-            let fallbackName = (cloudCouple.partnerAId === firebaseUser.uid ? cloudCouple.partnerBName : cloudCouple.partnerAName);
-            if (!fallbackName || fallbackName.toLowerCase() === userARef.current.name.toLowerCase() || fallbackName === 'Partner') {
-              fallbackName = expectedPartnerName;
-            }
+            const fallbackName = (cloudCouple.partnerAId === firebaseUser.uid ? cloudCouple.partnerBName : cloudCouple.partnerAName) || 'Partner';
             setUserB((prev) => ({
               ...prev,
               id: partnerUid,
               uid: partnerUid,
               name: fallbackName,
-              city: fallbackName === 'Akhila' ? 'Bengaluru' : 'Hyderabad',
             }));
           }
         } else {
-          // Unpaired / waiting: keep expected partner distinct from user
-          setUserB((prev) => ({
-            ...prev,
-            name: prev.name === 'Partner' || prev.name.toLowerCase() === userARef.current.name.toLowerCase() ? expectedPartnerName : prev.name,
-            city: prev.city || expectedPartnerCity,
-          }));
+          // Unpaired / waiting for partner
+          setUserB(UNPAIRED_PARTNER);
         }
 
         // Determine which slot current user occupies in cloud couple
@@ -1061,15 +997,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     // 3. Listen to Partner's User Document in real-time
-    const partnerUid = couple.partnerAId === firebaseUser.uid ? couple.partnerBId : couple.partnerAId;
+    const partnerUid = (couple.status === 'paired' && couple.partnerBId)
+      ? (couple.partnerAId === firebaseUser.uid ? couple.partnerBId : couple.partnerAId)
+      : '';
     let unsubPartnerDoc = () => {};
     if (partnerUid && partnerUid !== firebaseUser.uid) {
       unsubPartnerDoc = listenToUserDoc(partnerUid, (partnerProfile) => {
         if (partnerProfile) {
-          setUserB((prev) => ({
-            ...prev,
-            ...partnerProfile,
-          }));
+          setUserB(partnerProfile);
         }
       });
     }
@@ -1120,10 +1055,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, [couple?.id, firebaseUser?.uid]);
 
+  // Standalone real-time listener for partner profile changes
+  useEffect(() => {
+    if (!couple || !firebaseUser || isDemoMode) return;
+    const isPaired = couple.status === 'paired' && Boolean(couple.partnerBId && couple.partnerBId.trim() !== '');
+    const partnerUid = couple.partnerAId === firebaseUser.uid ? couple.partnerBId : couple.partnerAId;
+
+    if (!isPaired || !partnerUid || partnerUid === firebaseUser.uid) {
+      return;
+    }
+
+    getUserProfile(partnerUid).then((partnerProfile) => {
+      if (partnerProfile) {
+        setUserB(partnerProfile);
+      }
+    });
+
+    const unsub = listenToUserDoc(partnerUid, (partnerProfile) => {
+      if (partnerProfile) {
+        setUserB(partnerProfile);
+      }
+    });
+
+    return () => unsub();
+  }, [couple?.partnerAId, couple?.partnerBId, couple?.status, firebaseUser?.uid, isDemoMode]);
+
   // Synchronize state across browser tabs via storage events
   useEffect(() => {
     const handleStorage = (e: StorageEvent) => {
-      if (e.key === STORAGE_KEY && e.newValue) {
+      const expectedKey = isDemoMode ? 'betweenus_demo_state' : (firebaseUser ? `${STORAGE_KEY}_${firebaseUser.uid}` : null);
+      if (expectedKey && e.key === expectedKey && e.newValue) {
         try {
           const parsed = JSON.parse(e.newValue);
           if (parsed.notifications) setNotifications(parsed.notifications);
@@ -1149,7 +1110,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     window.addEventListener('storage', handleStorage);
     return () => window.removeEventListener('storage', handleStorage);
-  }, []);
+  }, [firebaseUser?.uid, isDemoMode]);
 
   // Synchronize state across browser tabs/windows
   useEffect(() => {
@@ -1157,21 +1118,43 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const handleMessage = (event: MessageEvent) => {
       const { type, payload } = event.data || {};
-      if (type === 'STATE_UPDATE') {
-        if (payload.messages) setMessages(payload.messages);
-        if (payload.moods) setMoods(payload.moods);
-        if (payload.memories) setMemories(payload.memories);
-        if (payload.events) setEvents(payload.events);
-        if (payload.virtualDates) setVirtualDates(payload.virtualDates);
-        if (payload.sharedSongs) setSharedSongs(payload.sharedSongs);
-        if (payload.sharedNotes) setSharedNotes(payload.sharedNotes);
-        if (payload.surprises) setSurprises(payload.surprises);
-        if (payload.notifications) setNotifications(payload.notifications);
-        if (payload.userA) setUserA(payload.userA);
-        if (payload.userB) setUserB(payload.userB);
-        if (payload.couple !== undefined) setCouple(payload.couple);
-        if (payload.gameSession !== undefined) setGameSession(payload.gameSession);
+      if (type === 'STATE_UPDATE' && payload) {
+        if (isDemoMode) {
+          if (!payload.isDemo) return;
+          if (payload.messages) setMessages(payload.messages);
+          if (payload.moods) setMoods(payload.moods);
+          if (payload.memories) setMemories(payload.memories);
+          if (payload.events) setEvents(payload.events);
+          if (payload.virtualDates) setVirtualDates(payload.virtualDates);
+          if (payload.sharedSongs) setSharedSongs(payload.sharedSongs);
+          if (payload.sharedNotes) setSharedNotes(payload.sharedNotes);
+          if (payload.surprises) setSurprises(payload.surprises);
+          if (payload.notifications) setNotifications(payload.notifications);
+          if (payload.userA) setUserA(payload.userA);
+          if (payload.userB) setUserB(payload.userB);
+          if (payload.couple !== undefined) setCouple(payload.couple);
+          if (payload.gameSession !== undefined) setGameSession(payload.gameSession);
+        } else {
+          if (payload.isDemo) return;
+          if (!firebaseUser) return;
+          // Only synchronize state within the same authenticated user session
+          if (payload.senderUid === firebaseUser.uid) {
+            if (payload.messages) setMessages(payload.messages);
+            if (payload.moods) setMoods(payload.moods);
+            if (payload.memories) setMemories(payload.memories);
+            if (payload.events) setEvents(payload.events);
+            if (payload.virtualDates) setVirtualDates(payload.virtualDates);
+            if (payload.sharedSongs) setSharedSongs(payload.sharedSongs);
+            if (payload.sharedNotes) setSharedNotes(payload.sharedNotes);
+            if (payload.surprises) setSurprises(payload.surprises);
+            if (payload.notifications) setNotifications(payload.notifications);
+            if (payload.userA) setUserA(payload.userA);
+            if (payload.couple !== undefined) setCouple(payload.couple);
+            if (payload.gameSession !== undefined) setGameSession(payload.gameSession);
+          }
+        }
       } else if (type === 'LOVE_BURST') {
+        if (payload?.coupleId && couple?.id && payload.coupleId !== couple.id) return;
         setQuickLoveBurst({
           type: payload.type,
           emoji: payload.emoji,
@@ -1179,8 +1162,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           id: Date.now(),
         });
       } else if (type === 'EMERGENCY_SOS_TRIGGERED' || type === 'EMERGENCY_SOS_ACKNOWLEDGED' || type === 'EMERGENCY_SOS_CANCELLED') {
+        if (payload?.coupleId && couple?.id && payload.coupleId !== couple.id) return;
         setActiveEmergencyAlert(payload);
       } else if (type === 'CALL_UPDATE') {
+        if (payload?.coupleId && couple?.id && payload.coupleId !== couple.id) return;
         if (payload && isCallStale(payload)) {
           setActiveCall(null);
         } else {
@@ -1193,12 +1178,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => {
       broadcastChannel.removeEventListener('message', handleMessage);
     };
-  }, [broadcastChannel]);
+  }, [broadcastChannel, firebaseUser, isDemoMode, couple?.id]);
 
   // Persist current state to localStorage and broadcast
   const saveAndBroadcast = useCallback(
     (overrides?: Record<string, any>) => {
       const stateToSave = {
+        senderUid: firebaseUser?.uid || activeUserId,
+        coupleId: couple?.id || '',
+        isDemo: isDemoMode,
         activeUserId,
         userA,
         userB,
@@ -1218,7 +1206,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
 
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
+        const storageKey = isDemoMode ? 'betweenus_demo_state' : `${STORAGE_KEY}_${firebaseUser?.uid || 'guest'}`;
+        localStorage.setItem(storageKey, JSON.stringify(stateToSave));
       } catch (err) {
         console.error('Failed to save to localStorage:', err);
       }
@@ -1231,6 +1220,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     },
     [
+      firebaseUser?.uid,
+      isDemoMode,
       activeUserId,
       userA,
       userB,
@@ -1245,31 +1236,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       surprises,
       notifications,
       gameSession,
+      activeCall,
       broadcastChannel,
     ]
   );
 
   // Compute Current & Partner User objects
-  const rawCurrentUser = activeUserId === userA.id ? userA : userB;
-  const rawPartnerUser = activeUserId === userA.id ? userB : userA;
+  const currentUser = isDemoMode
+    ? (activeUserId === userA.id ? userA : userB)
+    : userA;
 
-  const currentUser = rawCurrentUser;
   const partnerUser = useMemo(() => {
-    const isMeTeja = (currentUser.name || '').toLowerCase() === 'teja';
-    const isPartnerSame = (rawPartnerUser.name || '').toLowerCase() === (currentUser.name || '').toLowerCase();
-    const isPartnerGeneric = !rawPartnerUser.name || rawPartnerUser.name === 'Partner';
-
-    if (isPartnerSame || isPartnerGeneric) {
-      return {
-        ...rawPartnerUser,
-        name: isMeTeja ? 'Akhila' : 'Teja',
-        city: isMeTeja
-          ? (rawPartnerUser.city === 'Hyderabad' ? 'Bengaluru' : rawPartnerUser.city || 'Bengaluru')
-          : (rawPartnerUser.city === 'Bengaluru' ? 'Hyderabad' : rawPartnerUser.city || 'Hyderabad'),
-      };
+    if (isDemoMode) {
+      return activeUserId === userA.id ? userB : userA;
     }
-    return rawPartnerUser;
-  }, [currentUser.name, rawPartnerUser]);
+    if (!isPartnerPaired) {
+      return UNPAIRED_PARTNER;
+    }
+    return userB;
+  }, [isDemoMode, isPartnerPaired, activeUserId, userA, userB]);
 
   // Listen to Partner Live Location in Firebase Realtime Database
   useEffect(() => {
@@ -2373,20 +2358,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const pending = await ensureUserPendingCouple(currentUser);
       setCouple(pending);
       setMessages([]);
-      setUserB({
-        id: '',
-        uid: '',
-        name: 'Partner',
-        email: '',
-        avatarUrl: '/app-logo.svg',
-        timeZone: 'Asia/Kolkata',
-        anniversaryDate: new Date().toISOString().split('T')[0],
-        sleepStartHour: 23,
-        sleepEndHour: 7,
-        shareLocation: true,
-        emergencyContacts: [],
-      });
-      saveAndBroadcast({ couple: pending, messages: [] });
+      setUserB(UNPAIRED_PARTNER);
+      saveAndBroadcast({ couple: pending, messages: [], userB: UNPAIRED_PARTNER });
     }
   }, [couple, currentUser, saveAndBroadcast]);
 
@@ -2785,6 +2758,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const logOutFirebase = useCallback(async () => {
     try {
+      if (firebaseUser?.uid) {
+        try {
+          localStorage.removeItem(`${STORAGE_KEY}_${firebaseUser.uid}`);
+        } catch (_) {}
+      }
       await fbLogOut();
       setFirebaseUser(null);
       setIsDemoMode(false);
@@ -2792,11 +2770,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         localStorage.removeItem('betweenus_demo_mode');
       }
       setCouple(null);
+      setUserA(DEFAULT_USER_A);
+      setUserB(UNPAIRED_PARTNER);
       setMessages([]);
+      setMoods([]);
+      setMemories([]);
+      setActiveUserId('');
     } catch (err) {
       console.warn('Logout notice:', err);
     }
-  }, []);
+  }, [firebaseUser]);
 
   return (
     <AppContext.Provider

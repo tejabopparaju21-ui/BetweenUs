@@ -27,7 +27,8 @@ interface EmergencyModalProps {
 }
 
 export const EmergencyModal: React.FC<EmergencyModalProps> = ({ isOpen, onClose }) => {
-  const { currentUser, partnerUser, couple, triggerEmergencyAlert } = useApp();
+  const { currentUser, partnerUser, isPartnerPaired, couple, triggerEmergencyAlert } = useApp();
+  const partnerDisplayName = isPartnerPaired && partnerUser.name ? partnerUser.name : 'Partner';
   const [step, setStep] = useState<'confirm' | 'actions' | 'sending_loc'>('confirm');
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isTriggeringSiren, setIsTriggeringSiren] = useState(false);
@@ -47,7 +48,7 @@ export const EmergencyModal: React.FC<EmergencyModalProps> = ({ isOpen, onClose 
     if (partnerPhone) {
       window.location.href = `tel:${partnerPhone}`;
     } else {
-      setStatusMessage(`No phone number configured for ${partnerUser.name}. Please set it in Safety / Profile settings.`);
+      setStatusMessage(`No phone number configured for ${partnerDisplayName}. Please set it in Safety / Profile settings.`);
     }
   };
 
@@ -65,7 +66,7 @@ export const EmergencyModal: React.FC<EmergencyModalProps> = ({ isOpen, onClose 
 
   const handleSendLocationToPartner = () => {
     setStep('sending_loc');
-    setStatusMessage(`Attempting to acquire GPS coordinates to send to ${partnerUser.name}...`);
+    setStatusMessage(`Attempting to acquire GPS coordinates to send to ${partnerDisplayName}...`);
 
     // Fast path: if live location is already available from context, send immediately without waking hardware
     if (currentUser.location?.latitude && currentUser.location?.longitude) {
@@ -78,9 +79,9 @@ export const EmergencyModal: React.FC<EmergencyModalProps> = ({ isOpen, onClose 
 
       if (partnerPhone) {
         window.location.href = `sms:${partnerPhone}?body=${alertBody}`;
-        setStatusMessage(`Live location ready. Opening SMS app with pre-filled SOS text to ${partnerUser.name}.`);
+        setStatusMessage(`Live location ready. Opening SMS app with pre-filled SOS text to ${partnerDisplayName}.`);
       } else {
-        setStatusMessage(`Live location ready (${lat.toFixed(4)}, ${lng.toFixed(4)}), but ${partnerUser.name}'s phone number was not found.`);
+        setStatusMessage(`Live location ready (${lat.toFixed(4)}, ${lng.toFixed(4)}), but ${partnerDisplayName}'s phone number was not found.`);
       }
       return;
     }
@@ -101,15 +102,15 @@ export const EmergencyModal: React.FC<EmergencyModalProps> = ({ isOpen, onClose 
 
         if (partnerPhone) {
           window.location.href = `sms:${partnerPhone}?body=${alertBody}`;
-          setStatusMessage(`Location acquired. Opening SMS app with pre-filled SOS text to ${partnerUser.name}.`);
+          setStatusMessage(`Location acquired. Opening SMS app with pre-filled SOS text to ${partnerDisplayName}.`);
         } else {
-          setStatusMessage(`Location acquired (${lat.toFixed(4)}, ${lng.toFixed(4)}), but ${partnerUser.name}'s phone number was not found.`);
+          setStatusMessage(`Location acquired (${lat.toFixed(4)}, ${lng.toFixed(4)}), but ${partnerDisplayName}'s phone number was not found.`);
         }
       },
       (err) => {
         console.warn('Geolocation error during emergency:', err.message);
         setStatusMessage(
-          `Location could not be retrieved. Please call ${partnerUser.name} directly.`
+          `Location could not be retrieved. Please call ${partnerDisplayName} directly.`
         );
       },
       { timeout: 8000, enableHighAccuracy: true, maximumAge: 30000 }
@@ -120,7 +121,7 @@ export const EmergencyModal: React.FC<EmergencyModalProps> = ({ isOpen, onClose 
     setIsTriggeringSiren(true);
     try {
       await triggerEmergencyAlert(`🚨 URGENT SOS from ${currentUser.name}! Please call or check on me immediately!`);
-      setStatusMessage(`🚨 High-priority emergency siren dispatched to ${partnerUser.name}'s phone!`);
+      setStatusMessage(`🚨 High-priority emergency siren dispatched to ${partnerDisplayName}'s phone!`);
     } catch (err: any) {
       setStatusMessage('Failed to trigger in-app siren: ' + err?.message);
     } finally {
@@ -174,7 +175,7 @@ export const EmergencyModal: React.FC<EmergencyModalProps> = ({ isOpen, onClose 
                 </div>
                 <h3 className="text-xl font-bold text-slate-900">Are you in an emergency?</h3>
                 <p className="text-xs sm:text-sm text-slate-600 mt-1">
-                  Call {partnerUser.name} directly on mobile or broadcast a high-priority siren to their device.
+                  Call {partnerDisplayName} directly on mobile or broadcast a high-priority siren to their device.
                 </p>
               </div>
 
@@ -185,7 +186,7 @@ export const EmergencyModal: React.FC<EmergencyModalProps> = ({ isOpen, onClose 
                   className="w-full py-4 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] font-black text-white shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2.5 transition text-center"
                 >
                   <PhoneCall className="w-5 h-5 animate-bounce" />
-                  <span>CALL {partnerUser.name.toUpperCase()} NOW ({partnerPhone})</span>
+                  <span>CALL {partnerDisplayName.toUpperCase()} NOW ({partnerPhone})</span>
                 </a>
               ) : (
                 <button
@@ -194,7 +195,7 @@ export const EmergencyModal: React.FC<EmergencyModalProps> = ({ isOpen, onClose 
                   className="w-full py-3.5 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 font-bold text-white shadow-md flex items-center justify-center gap-2 transition"
                 >
                   <PhoneCall className="w-5 h-5" />
-                  <span>Call {partnerUser.name} on Phone</span>
+                  <span>Call {partnerDisplayName} on Phone</span>
                 </button>
               )}
 
@@ -230,7 +231,7 @@ export const EmergencyModal: React.FC<EmergencyModalProps> = ({ isOpen, onClose 
                   </div>
                   <div className="min-w-0">
                     <div className="font-extrabold text-sm text-slate-900 truncate">
-                      Call {partnerUser.name} on Mobile
+                      Call {partnerDisplayName} on Mobile
                     </div>
                     <div className="font-mono text-emerald-700 text-xs font-bold truncate">
                       {partnerPhone || 'No phone configured in profile'}
@@ -268,7 +269,7 @@ export const EmergencyModal: React.FC<EmergencyModalProps> = ({ isOpen, onClose 
                     <Volume2 className="w-5 h-5 animate-bounce" />
                   </div>
                   <div className="min-w-0">
-                    <div className="font-bold text-sm">Sound Siren on {partnerUser.name}'s Device</div>
+                    <div className="font-bold text-sm">Sound Siren on {partnerDisplayName}'s Device</div>
                     <div className="text-[11px] text-red-100 truncate">
                       Loud piercing alarm + vibration (bypasses silent mode)
                     </div>
@@ -288,7 +289,7 @@ export const EmergencyModal: React.FC<EmergencyModalProps> = ({ isOpen, onClose 
                     <MapPin className="w-5 h-5" />
                   </div>
                   <div className="min-w-0">
-                    <div className="font-bold text-xs sm:text-sm">SMS Live Location to {partnerUser.name}</div>
+                    <div className="font-bold text-xs sm:text-sm">SMS Live Location to {partnerDisplayName}</div>
                     <div className="text-[11px] text-slate-500 truncate">
                       Pre-filled SMS with exact Google Maps coordinates
                     </div>

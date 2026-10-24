@@ -17,6 +17,7 @@ export const HomeEmergencyButton: React.FC = () => {
   const {
     currentUser,
     partnerUser,
+    isPartnerPaired,
     couple,
     triggerEmergencyAlert,
     activeEmergencyAlert,
@@ -25,6 +26,8 @@ export const HomeEmergencyButton: React.FC = () => {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [selectedMessage, setSelectedMessage] = useState('🚨 URGENT SOS! Please call or check on me immediately!');
   const [isTriggering, setIsTriggering] = useState(false);
+
+  const partnerDisplayName = isPartnerPaired && partnerUser.name ? partnerUser.name : 'Partner';
 
   const partnerPhone =
     partnerUser.phoneNumber ||
@@ -79,10 +82,10 @@ export const HomeEmergencyButton: React.FC = () => {
                 )}
               </div>
               <h3 className="text-base sm:text-lg font-black tracking-tight text-white mt-0.5">
-                Emergency SOS: {partnerUser.name}
+                Emergency SOS: {partnerDisplayName}
               </h3>
               <p className="text-xs text-rose-100/90 max-w-sm leading-relaxed mt-0.5">
-                Call {partnerUser.name} directly on mobile or sound a loud piercing siren on their phone.
+                Call {partnerDisplayName} directly on mobile or sound a loud piercing siren on their phone.
               </p>
               {/* Connected Phone Indicator */}
               <div className="flex items-center gap-2 mt-1.5 flex-wrap">
@@ -104,7 +107,7 @@ export const HomeEmergencyButton: React.FC = () => {
                 className="px-4 py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-black text-xs sm:text-sm shadow-lg shadow-black/20 hover:shadow-xl transition-all duration-200 active:scale-95 flex items-center justify-center gap-2 text-center"
               >
                 <PhoneCall className="w-4 h-4 animate-bounce" />
-                <span>CALL {partnerUser.name.toUpperCase()}</span>
+                <span>CALL {partnerDisplayName.toUpperCase()}</span>
               </a>
             )}
             <button
@@ -131,7 +134,7 @@ export const HomeEmergencyButton: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="font-extrabold text-base text-slate-800">
-                    Ring {partnerUser.name}'s Phone
+                    Ring {partnerDisplayName}'s Phone
                   </h3>
                   <p className="text-xs text-slate-500">Emergency Siren &amp; High-Priority Alarm</p>
                 </div>
@@ -149,10 +152,10 @@ export const HomeEmergencyButton: React.FC = () => {
             <div className="p-3.5 rounded-2xl bg-red-50 border border-red-200 text-xs text-red-800 space-y-1">
               <div className="font-bold flex items-center gap-1.5">
                 <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
-                <span>Will sound alarm on {partnerUser.name}'s device</span>
+                <span>Will sound alarm on {partnerDisplayName}'s device</span>
               </div>
               <p className="text-[11px] text-red-700 leading-relaxed">
-                This triggers a dual-tone emergency siren at full volume and continuous SOS morse vibration on {partnerUser.name}'s phone along with your live location.
+                This triggers a dual-tone emergency siren at full volume and continuous SOS morse vibration on {partnerDisplayName}'s phone along with your live location.
               </p>
             </div>
 
@@ -190,7 +193,7 @@ export const HomeEmergencyButton: React.FC = () => {
                 </div>
                 <div className="truncate">
                   <span className="font-bold text-slate-800 block text-xs truncate">
-                    {partnerUser.name}'s Connected Phone
+                    {partnerDisplayName}'s Connected Phone
                   </span>
                   <span className="font-mono text-indigo-700 text-xs font-semibold">
                     {partnerUser.phoneNumber || partnerUser.emergencyContacts?.[0]?.phone || 'Not configured in profile'}

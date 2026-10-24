@@ -17,6 +17,7 @@ export const Navigation: React.FC = () => {
     setActiveTab,
     currentUser,
     partnerUser,
+    isPartnerPaired,
     isDemoMode,
     firebaseUser,
   } = useApp();
@@ -68,13 +69,15 @@ export const Navigation: React.FC = () => {
             </div>
           </button>
 
-          {/* Permanent Couple Header Center Capsule */}
-          <div className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full bg-rose-50/90 border border-rose-200/80 shadow-2xs">
-            <span className="text-xs">💑</span>
-            <span className="font-black text-xs tracking-wider text-rose-600 uppercase">
-              TEJA and AKHILA
-            </span>
-          </div>
+          {/* Couple Header Center Capsule - Displayed only when relationship connection is established */}
+          {isPartnerPaired && partnerUser.name ? (
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full bg-rose-50/90 border border-rose-200/80 shadow-2xs">
+              <span className="text-xs">💑</span>
+              <span className="font-black text-xs tracking-wider text-rose-600 uppercase">
+                {currentUser.name} and {partnerUser.name}
+              </span>
+            </div>
+          ) : null}
 
           {/* Emergency SOS Button */}
           <button

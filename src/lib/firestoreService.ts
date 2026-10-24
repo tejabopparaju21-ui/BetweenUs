@@ -473,9 +473,7 @@ export async function ensureUserPendingCouple(user: UserProfile): Promise<Couple
   const coupleId = `couple_${code.replace(/[^A-Z0-9]/g, '')}`;
   const coupleRef = doc(db, 'couples', coupleId);
 
-  const isUserTeja = (user.name || '').toLowerCase() === 'teja';
-  const myName = isUserTeja ? 'Teja' : 'Akhila';
-  const partnerName = isUserTeja ? 'Akhila' : 'Teja';
+  const myName = user.name?.trim() || 'Partner 1';
 
   try {
     const snap = await getDoc(coupleRef);
@@ -484,27 +482,24 @@ export async function ensureUserPendingCouple(user: UserProfile): Promise<Couple
       let shouldUpdate = false;
       const updates: Partial<Couple> = {};
 
-      if (!existing.partnerAName || existing.partnerAName === 'You') {
-        existing.partnerAName = myName;
-        updates.partnerAName = myName;
-        shouldUpdate = true;
-      }
-      if (!existing.partnerBName || existing.partnerBName === 'Partner' || existing.partnerBName.toLowerCase() === existing.partnerAName.toLowerCase()) {
-        existing.partnerBName = partnerName;
-        updates.partnerBName = partnerName;
-        shouldUpdate = true;
-      }
-      if (existing.partnerAName.toLowerCase() === existing.partnerBName.toLowerCase()) {
-        existing.partnerAName = 'Teja';
-        existing.partnerBName = 'Akhila';
-        updates.partnerAName = 'Teja';
-        updates.partnerBName = 'Akhila';
-        shouldUpdate = true;
-      }
-      if (!existing.relationshipName || existing.relationshipName.includes('Haven') || existing.relationshipName.includes('You')) {
-        existing.relationshipName = 'Teja & Akhila';
-        updates.relationshipName = 'Teja & Akhila';
-        shouldUpdate = true;
+      if (existing.partnerAId === user.id) {
+        if (!existing.partnerAName || existing.partnerAName === 'You') {
+          existing.partnerAName = myName;
+          updates.partnerAName = myName;
+          shouldUpdate = true;
+        }
+        if (existing.status === 'waiting_for_partner' || !existing.partnerBId) {
+          if (existing.partnerBName) {
+            existing.partnerBName = '';
+            updates.partnerBName = '';
+            shouldUpdate = true;
+          }
+          if (existing.partnerBId) {
+            existing.partnerBId = '';
+            updates.partnerBId = '';
+            shouldUpdate = true;
+          }
+        }
       }
 
       if (shouldUpdate) {
@@ -522,11 +517,11 @@ export async function ensureUserPendingCouple(user: UserProfile): Promise<Couple
     partnerAId: user.id,
     partnerAName: myName,
     partnerBId: '',
-    partnerBName: partnerName,
+    partnerBName: '',
     status: 'waiting_for_partner',
     members: [user.id],
     partnerUids: [user.id],
-    relationshipName: 'Teja & Akhila',
+    relationshipName: `${myName}'s Space`,
     anniversaryDate: user.anniversaryDate || new Date().toISOString().split('T')[0],
     nextMeetingDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
     nextMeetingTitle: 'Our Next Reunion',
@@ -577,18 +572,18 @@ export async function pairPartnersWithCode(
       if (!userSnap.empty) {
         const partnerUserData = userSnap.docs[0].data() as UserProfile;
         const coupleId = `couple_${cleanCode.replace(/[^A-Z0-9]/g, '')}`;
-        const pIsTeja = (partnerUserData.name || '').toLowerCase() === 'teja';
+        const pName = partnerUserData.name?.trim() || 'Partner 1';
         couple = {
           id: coupleId,
           code: cleanCode,
           partnerAId: partnerUserData.id,
-          partnerAName: pIsTeja ? 'Teja' : 'Akhila',
+          partnerAName: pName,
           partnerBId: '',
-          partnerBName: pIsTeja ? 'Akhila' : 'Teja',
+          partnerBName: '',
           status: 'waiting_for_partner',
           members: [partnerUserData.id],
           partnerUids: [partnerUserData.id],
-          relationshipName: 'Teja & Akhila',
+          relationshipName: `${pName}'s Space`,
           anniversaryDate: partnerUserData.anniversaryDate || new Date().toISOString().split('T')[0],
           nextMeetingDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
           nextMeetingTitle: 'Our Next Reunion',
@@ -633,16 +628,21 @@ export async function pairPartnersWithCode(
 
     // Pair currentUser as partnerB
     couple.partnerBId = currentUser.id;
-    // Assign distinct names so partners are never both named 'Teja'
-    if (couple.partnerAName.toLowerCase() === 'teja') {
-      couple.partnerBName = currentUser.name.toLowerCase() === 'teja' ? 'Akhila' : (currentUser.name || 'Akhila');
-    } else if (couple.partnerAName.toLowerCase() === 'akhila') {
-      couple.partnerBName = currentUser.name.toLowerCase() === 'akhila' ? 'Teja' : (currentUser.name || 'Teja');
-    } else {
-      couple.partnerBName = currentUser.name || 'Akhila';
+
+    // Fetch Partner A's genuine authenticated user profile by unique ID
+    let partnerAName = couple.partnerAName?.trim() || 'Partner 1';
+    if (couple.partnerAId) {
+      const partnerAProfile = await getUserProfile(couple.partnerAId);
+      if (partnerAProfile?.name?.trim()) {
+        partnerAName = partnerAProfile.name.trim();
+      }
     }
+    const partnerBName = currentUser.name?.trim() || 'Partner 2';
+
+    couple.partnerAName = partnerAName;
+    couple.partnerBName = partnerBName;
     couple.status = 'paired';
-    couple.relationshipName = 'Teja & Akhila';
+    couple.relationshipName = `${partnerAName} & ${partnerBName}`;
 
     const members = Array.from(new Set([couple.partnerAId, currentUser.id].filter(Boolean)));
     couple.members = members;
@@ -671,7 +671,7 @@ export async function pairPartnersWithCode(
     return {
       success: true,
       couple,
-      message: `Successfully linked with ${partnerName}! Welcome to your private haven.`,
+      message: `Successfully linked with ${partnerAName}! Welcome to your private haven.`,
     };
   } catch (err: any) {
     console.error('pairPartnersWithCode error:', err);
@@ -706,6 +706,7 @@ export async function unlinkCoupleInFirestore(
         couple.members = [couple.partnerAId];
         couple.partnerUids = [couple.partnerAId];
       }
+      couple.relationshipName = `${couple.partnerAName || 'Our'}'s Space`;
       couple.updatedAt = new Date().toISOString();
       await setDoc(coupleRef, sanitizeForFirestore(couple), { merge: true });
     }

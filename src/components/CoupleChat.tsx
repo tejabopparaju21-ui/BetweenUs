@@ -60,6 +60,7 @@ export const CoupleChat: React.FC = () => {
     loginWithGoogle,
     startCall,
     isDemoMode,
+    isPartnerPaired,
     switchActiveUser,
   } = useApp();
 
@@ -359,28 +360,38 @@ export const CoupleChat: React.FC = () => {
       <div className="bg-white/95 backdrop-blur-md px-3.5 sm:px-5 py-2.5 border-b border-rose-100 flex items-center justify-between shadow-xs shrink-0 z-10">
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="relative">
-            <img
-              src={partnerUser.avatarUrl}
-              alt={partnerUser.name}
-              className="w-10 h-10 rounded-full object-cover border-2 border-rose-300"
-            />
-            <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white" />
+            {isPartnerPaired && partnerUser.avatarUrl && partnerUser.avatarUrl !== '/app-logo.svg' ? (
+              <img
+                src={partnerUser.avatarUrl}
+                alt={partnerUser.name}
+                className="w-10 h-10 rounded-full object-cover border-2 border-rose-300"
+              />
+            ) : (
+              <div className="w-10 h-10 rounded-full bg-rose-100 border-2 border-rose-200 flex items-center justify-center text-rose-600 font-bold text-sm">
+                {isPartnerPaired && partnerUser.name ? partnerUser.name.charAt(0).toUpperCase() : '💌'}
+              </div>
+            )}
+            <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full ${isPartnerPaired ? 'bg-emerald-500' : 'bg-slate-300'} ring-2 ring-white`} />
           </div>
           <div>
             <div className="font-bold text-sm text-slate-800 flex items-center gap-1.5">
-              <span>{partnerUser.name}</span>
+              <span>{isPartnerPaired && partnerUser.name ? partnerUser.name : 'Waiting for partner...'}</span>
               <span className="text-[10px] bg-rose-50 text-rose-600 px-1.5 py-0.5 rounded-full font-medium">
-                Private Couple Channel
+                {isPartnerPaired ? 'Private Couple Channel' : 'Invitation Pending'}
               </span>
             </div>
             <div className="text-[11px] text-slate-500 flex items-center gap-1.5 flex-wrap">
-              <span>📍 {partnerUser.city || 'Bengaluru'}</span>
+              <span>📍 {isPartnerPaired && partnerUser.city ? partnerUser.city : 'Share code to link'}</span>
               <span>•</span>
               <span className="font-semibold text-slate-700">{formatISTTime(new Date())} IST</span>
-              <span>•</span>
-              <span className={partnerSleeping ? 'text-indigo-600 font-bold' : 'text-emerald-600 font-bold'}>
-                {partnerSleeping ? 'Sleeping 🌙' : 'Active ☀️'}
-              </span>
+              {isPartnerPaired && (
+                <>
+                  <span>•</span>
+                  <span className={partnerSleeping ? 'text-indigo-600 font-bold' : 'text-emerald-600 font-bold'}>
+                    {partnerSleeping ? 'Sleeping 🌙' : 'Active ☀️'}
+                  </span>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -391,7 +402,7 @@ export const CoupleChat: React.FC = () => {
             type="button"
             onClick={() => handleStartCall('voice')}
             className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-600 border border-rose-200/80 flex items-center justify-center transition active:scale-95 shadow-2xs cursor-pointer tap-bounce"
-            title={`Voice Call with ${partnerUser.name}`}
+            title={isPartnerPaired && partnerUser.name ? `Voice Call with ${partnerUser.name}` : 'Voice Call'}
             aria-label="Voice Call"
           >
             <Phone className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
@@ -402,7 +413,7 @@ export const CoupleChat: React.FC = () => {
             type="button"
             onClick={() => handleStartCall('video')}
             className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-gradient-to-tr from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 text-white flex items-center justify-center transition active:scale-95 shadow-xs shadow-rose-500/25 cursor-pointer tap-bounce"
-            title={`Video Call with ${partnerUser.name}`}
+            title={isPartnerPaired && partnerUser.name ? `Video Call with ${partnerUser.name}` : 'Video Call'}
             aria-label="Video Call"
           >
             <Video className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
@@ -590,7 +601,7 @@ export const CoupleChat: React.FC = () => {
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
         <div className="text-center py-2">
           <span className="px-3 py-1 rounded-full bg-rose-50 text-rose-700 text-[11px] font-medium border border-rose-100">
-            🔒 Private couple channel. Only {currentUser.name} and {partnerUser.name} can read this chat.
+            🔒 Private couple channel. {isPartnerPaired && partnerUser.name ? `Only ${currentUser.name} and ${partnerUser.name} can read this chat.` : 'Waiting for partner to connect.'}
           </span>
         </div>
 
@@ -602,10 +613,10 @@ export const CoupleChat: React.FC = () => {
             </div>
             <h3 className="font-bold text-slate-800 text-sm">Your Private Haven is Ready</h3>
             <p className="text-xs font-bold text-rose-500 mt-0.5">
-              starts with TEJA and AKHILA
+              starts with {isPartnerPaired && partnerUser.name ? `${currentUser.name} and ${partnerUser.name}` : (isDemoMode ? 'TEJA and AKHILA' : currentUser.name)}
             </p>
             <p className="text-xs text-slate-500 mt-1 max-w-xs leading-relaxed">
-              Send the first sweet message to {partnerUser.name}. Messages are stored permanently in Cloud Firestore and sync in real time across devices.
+              Send the first sweet message to {isPartnerPaired && partnerUser.name ? partnerUser.name : 'your partner'}. Messages are stored permanently in Cloud Firestore and sync in real time across devices.
             </p>
           </div>
         )}
@@ -625,7 +636,7 @@ export const CoupleChat: React.FC = () => {
           const isFromMe =
             (Boolean(currentUser.id) && msg.senderId === currentUser.id) ||
             (Boolean(currentUser.uid) && msg.senderId === currentUser.uid) ||
-            (Boolean(firebaseUser?.uid) && msg.senderId === firebaseUser.uid) ||
+            (Boolean(firebaseUser?.uid) && msg.senderId === firebaseUser?.uid) ||
             (Boolean(msgSenderNameLower) && Boolean(currentNameLower) && msgSenderNameLower === currentNameLower);
 
           // Partner messages must NEVER be classified as 'Me'
@@ -1328,7 +1339,7 @@ export const CoupleChat: React.FC = () => {
             <div className="text-center mb-4">
               <h3 className="text-base font-black text-slate-800">Clear Chat History?</h3>
               <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                Are you sure you want to clear all chat messages between you and <strong className="text-slate-700">{partnerUser.name}</strong>? This will permanently delete all messages for both partners.
+                Are you sure you want to clear all chat messages between you and <strong className="text-slate-700">{isPartnerPaired && partnerUser.name ? partnerUser.name : 'your partner'}</strong>? This will permanently delete all messages for both partners.
               </p>
             </div>
 

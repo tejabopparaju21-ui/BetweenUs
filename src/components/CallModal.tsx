@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
+import { CallSession } from '../types';
 import {
   Phone,
   PhoneOff,
@@ -613,7 +614,7 @@ export const CallModal: React.FC = () => {
       : currentCall.iceCandidatesCaller || [];
 
     if (remoteCandidates.length > 0) {
-      remoteCandidates.forEach((candStr) => {
+      remoteCandidates.forEach((candStr: string) => {
         if (!appliedCandidatesRef.current.has(candStr)) {
           if (pc.remoteDescription && pc.remoteDescription.type) {
             applyCandidate(candStr);

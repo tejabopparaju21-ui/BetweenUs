@@ -26,6 +26,7 @@ export const LiveLocationModal: React.FC<LiveLocationModalProps> = ({ isOpen, on
   const {
     currentUser,
     partnerUser,
+    isPartnerPaired,
     isLocating,
     locationError,
     clearLocationError,
@@ -36,6 +37,8 @@ export const LiveLocationModal: React.FC<LiveLocationModalProps> = ({ isOpen, on
   const [selectedCityUserA, setSelectedCityUserA] = useState<string>(currentUser.city || 'Hyderabad');
   const [selectedCityUserB, setSelectedCityUserB] = useState<string>(partnerUser.city || 'Bengaluru');
   const [actionSuccessMsg, setActionSuccessMsg] = useState<string | null>(null);
+
+  const partnerDisplayName = isPartnerPaired && partnerUser.name ? partnerUser.name : 'Partner';
 
   if (!isOpen) return null;
 
@@ -48,13 +51,13 @@ export const LiveLocationModal: React.FC<LiveLocationModalProps> = ({ isOpen, on
     clearLocationError();
     const success = await requestLocationPermission(targetSlot);
     if (success) {
-      triggerSuccess(`Live GPS location updated successfully for ${targetSlot === 'userB' ? partnerUser.name : currentUser.name}!`);
+      triggerSuccess(`Live GPS location updated successfully for ${targetSlot === 'userB' ? partnerDisplayName : currentUser.name}!`);
     }
   };
 
   const handleApplyCity = (targetSlot: 'current' | 'userA' | 'userB', cityName: string) => {
     setPartnerLocationManually(targetSlot, cityName);
-    triggerSuccess(`Location set to ${cityName} for ${targetSlot === 'userB' ? partnerUser.name : currentUser.name}`);
+    triggerSuccess(`Location set to ${cityName} for ${targetSlot === 'userB' ? partnerDisplayName : currentUser.name}`);
   };
 
   // Distance calculation
@@ -168,12 +171,12 @@ export const LiveLocationModal: React.FC<LiveLocationModalProps> = ({ isOpen, on
 
             <div className="flex items-center gap-2 text-right">
               <div className="leading-tight">
-                <span className="font-bold block">{partnerUser.name}</span>
+                <span className="font-bold block">{partnerDisplayName}</span>
                 <span className="text-[10px] text-rose-200">{partnerUser.city || 'Bengaluru'}</span>
               </div>
               <img
                 src={partnerUser.avatarUrl}
-                alt={partnerUser.name}
+                alt={partnerDisplayName}
                 className="w-7 h-7 rounded-full border border-white object-cover"
               />
             </div>
@@ -277,12 +280,12 @@ export const LiveLocationModal: React.FC<LiveLocationModalProps> = ({ isOpen, on
             <div className="flex items-center gap-2">
               <img
                 src={partnerUser.avatarUrl}
-                alt={partnerUser.name}
+                alt={partnerDisplayName}
                 className="w-9 h-9 rounded-full object-cover border border-pink-200"
               />
               <div>
                 <span className="font-extrabold text-sm text-slate-800 flex items-center gap-1.5">
-                  <span>{partnerUser.name}</span>
+                  <span>{partnerDisplayName}</span>
                   <span className="text-[10px] bg-pink-100 text-pink-700 px-2 py-0.2 rounded-full font-bold">
                     Partner
                   </span>
@@ -319,7 +322,7 @@ export const LiveLocationModal: React.FC<LiveLocationModalProps> = ({ isOpen, on
           {/* Quick city selector for testing partner side */}
           <div className="pt-1 space-y-1.5">
             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide block">
-              Set {partnerUser.name}'s Location (for dual device testing):
+              Set {partnerDisplayName}'s Location (for dual device testing):
             </span>
             <div className="flex items-center gap-2">
               <select
@@ -330,7 +333,7 @@ export const LiveLocationModal: React.FC<LiveLocationModalProps> = ({ isOpen, on
                 }}
                 className="flex-1 text-xs py-1.5 px-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 font-medium focus:ring-2 focus:ring-pink-500 outline-hidden"
               >
-                <option value="">Select Indian City for {partnerUser.name}...</option>
+                <option value="">Select Indian City for {partnerDisplayName}...</option>
                 {INDIAN_CITIES.map((c) => (
                   <option key={c.name} value={c.name}>
                     {c.displayName}

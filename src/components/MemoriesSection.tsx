@@ -25,6 +25,8 @@ export const MemoriesSection: React.FC = () => {
   const {
     currentUser,
     partnerUser,
+    isPartnerPaired,
+    isDemoMode,
     couple,
     memories,
     addMemory,
@@ -614,7 +616,7 @@ export const MemoriesSection: React.FC = () => {
           Between<span className="text-rose-600">Us</span>
         </p>
         <p className="text-[11px] font-bold text-rose-500 mt-0.5">
-          starts with TEJA and AKHILA
+          starts with {isPartnerPaired && partnerUser.name ? `${currentUser.name} and ${partnerUser.name}` : (isDemoMode ? 'TEJA and AKHILA' : currentUser.name)}
         </p>
       </div>
     </div>

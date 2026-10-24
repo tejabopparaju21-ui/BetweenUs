@@ -54,6 +54,7 @@ export const HomeDashboard: React.FC = () => {
     requestLocationPermission,
     startCall,
     isPartnerPaired,
+    isDemoMode,
     pairWithPartnerCode,
     firebaseUser,
     notifications,
@@ -260,9 +261,15 @@ export const HomeDashboard: React.FC = () => {
             <span className="text-rose-500">❤️</span>
           </h2>
           <p className="text-[11px] sm:text-xs text-slate-600 font-bold">
-            {bothShareLocation
-              ? `${distanceKm.toLocaleString()} km apart • TEJA & AKHILA ❤️`
-              : `TEJA & AKHILA • Connected heart to heart ❤️`}
+            {isPartnerPaired && partnerUser.name
+              ? (bothShareLocation
+                  ? `${distanceKm.toLocaleString()} km apart • ${currentUser.name.toUpperCase()} & ${partnerUser.name.toUpperCase()} ❤️`
+                  : `${currentUser.name.toUpperCase()} & ${partnerUser.name.toUpperCase()} • Connected heart to heart ❤️`)
+              : (isDemoMode
+                  ? (bothShareLocation
+                      ? `${distanceKm.toLocaleString()} km apart • TEJA & AKHILA ❤️`
+                      : `TEJA & AKHILA • Connected heart to heart ❤️`)
+                  : `Waiting for partner to connect • Connected heart to heart ❤️`)}
           </p>
         </div>
 
@@ -473,11 +480,11 @@ export const HomeDashboard: React.FC = () => {
             {/* Top status bar inside card */}
             <div className="flex items-center justify-between text-[11px] text-rose-100 mb-2.5 pb-2 border-b border-white/15">
               <span className="inline-flex items-center gap-1 font-bold">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span>Connected</span>
+                <span className={`w-2 h-2 rounded-full ${isPartnerPaired ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400 animate-ping'}`} />
+                <span>{isPartnerPaired ? 'Connected' : 'Waiting for partner...'}</span>
               </span>
               <span className="text-[10px] font-semibold bg-white/20 px-2 py-0.5 rounded-full">
-                {daysTogether} days together
+                {isPartnerPaired ? `${daysTogether} days together` : 'Share Code to Link'}
               </span>
             </div>
 
@@ -516,20 +523,26 @@ export const HomeDashboard: React.FC = () => {
               {/* Partner photo */}
               <div className="flex flex-col items-center">
                 <div className="relative">
-                  <img
-                    src={partnerUser.avatarUrl}
-                    alt={partnerUser.name}
-                    className="w-14 h-14 sm:w-16 sm:h-16 rounded-full object-cover border-2 border-white shadow-md ring-2 ring-rose-400/40"
-                  />
+                  {isPartnerPaired && partnerUser.avatarUrl && partnerUser.avatarUrl !== '/app-logo.svg' ? (
+                    <img
+                      src={partnerUser.avatarUrl}
+                      alt={partnerUser.name}
+                      className="w-14 h-14 sm:w-16 sm:h-16 rounded-full object-cover border-2 border-white shadow-md ring-2 ring-rose-400/40"
+                    />
+                  ) : (
+                    <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-white/20 border-2 border-white/40 flex items-center justify-center text-white text-base font-bold shadow-md ring-2 ring-rose-400/40">
+                      {isPartnerPaired && partnerUser.name ? partnerUser.name.charAt(0).toUpperCase() : '💌'}
+                    </div>
+                  )}
                   <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-1.5 py-0.2 rounded-full bg-white text-rose-700 text-[9px] font-black shadow-2xs whitespace-nowrap">
                     Partner
                   </span>
                 </div>
                 <span className="text-xs font-extrabold text-white mt-2 truncate max-w-[70px]">
-                  {partnerUser.name}
+                  {isPartnerPaired && partnerUser.name ? partnerUser.name : 'Waiting...'}
                 </span>
                 <span className="text-[10px] text-rose-200">
-                  {partnerUser.city || 'Bengaluru'}
+                  {isPartnerPaired && partnerUser.city ? partnerUser.city : 'Not linked'}
                 </span>
               </div>
             </div>
@@ -540,7 +553,7 @@ export const HomeDashboard: React.FC = () => {
                 type="button"
                 onClick={() => startCall('voice')}
                 className="flex-1 py-2 px-3 rounded-2xl bg-white/20 hover:bg-white/30 text-white font-bold text-xs flex items-center justify-center gap-2 transition active:scale-95 cursor-pointer backdrop-blur-md shadow-xs border border-white/25"
-                title={`Voice Call with ${partnerUser.name}`}
+                title={isPartnerPaired && partnerUser.name ? `Voice Call with ${partnerUser.name}` : 'Voice Call'}
               >
                 <Phone className="w-3.5 h-3.5 text-rose-300" />
                 <span>Voice Call</span>
@@ -549,7 +562,7 @@ export const HomeDashboard: React.FC = () => {
                 type="button"
                 onClick={() => startCall('video')}
                 className="flex-1 py-2 px-3 rounded-2xl bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 text-white font-bold text-xs flex items-center justify-center gap-2 transition active:scale-95 cursor-pointer shadow-md shadow-rose-950/40 border border-white/30"
-                title={`Video Call with ${partnerUser.name}`}
+                title={isPartnerPaired && partnerUser.name ? `Video Call with ${partnerUser.name}` : 'Video Call'}
               >
                 <Video className="w-3.5 h-3.5" />
                 <span>Video Call</span>
@@ -834,7 +847,9 @@ export const HomeDashboard: React.FC = () => {
           <div className="flex items-center gap-1.5 truncate">
             <span>{!userSleeping && !partnerSleeping ? '✨' : '🌙'}</span>
             <span className="truncate">
-              {!userSleeping && !partnerSleeping
+              {!isPartnerPaired
+                ? 'Connect with your partner to share live rhythm & timezones'
+                : !userSleeping && !partnerSleeping
                 ? `Both awake across India (${currentUser.city || 'Hyderabad'} & ${partnerUser.city || 'Bengaluru'})`
                 : partnerSleeping
                 ? `${partnerUser.name} is resting peacefully in ${partnerUser.city || 'Bengaluru'} 🌙`
@@ -1235,7 +1250,7 @@ export const HomeDashboard: React.FC = () => {
             <span className="text-[11px] font-bold text-slate-700">Between<span className="text-rose-600">Us</span></span>
           </div>
           <p className="text-xs font-black text-rose-600 tracking-wide">
-            starts with TEJA and AKHILA
+            starts with {isPartnerPaired && partnerUser.name ? `${currentUser.name} and ${partnerUser.name}` : (isDemoMode ? 'TEJA and AKHILA' : currentUser.name)}
           </p>
           <p className="text-[10px] text-slate-400 mt-1 font-medium">
             Hyderabad ❤️ Bengaluru • Connected heart to heart across the miles

@@ -25,12 +25,14 @@ export const EmergencyAlertModal: React.FC = () => {
     activeEmergencyAlert,
     currentUser,
     partnerUser,
+    isPartnerPaired,
     acknowledgeEmergencyAlert,
     cancelEmergencyAlert,
   } = useApp();
 
   const [isMutedManually, setIsMutedManually] = useState(false);
 
+  const partnerDisplayName = isPartnerPaired && partnerUser.name ? partnerUser.name : 'Partner';
   const isSender = activeEmergencyAlert?.senderId === currentUser.id;
   const isActive = activeEmergencyAlert?.status === 'active';
   const isAcknowledged = activeEmergencyAlert?.status === 'acknowledged';
@@ -110,7 +112,7 @@ export const EmergencyAlertModal: React.FC = () => {
               </div>
               <h2 className="text-xl font-black tracking-tight text-white mt-0.5">
                 {isSender
-                  ? `Ringing ${partnerUser.name}'s Phone!`
+                  ? `Ringing ${partnerDisplayName}'s Phone!`
                   : `EMERGENCY ALERT FROM ${activeEmergencyAlert.senderName.toUpperCase()}!`}
               </h2>
             </div>
@@ -139,7 +141,7 @@ export const EmergencyAlertModal: React.FC = () => {
               <p className="text-sm font-semibold text-red-100 leading-relaxed">
                 {activeEmergencyAlert.message ||
                   (isSender
-                    ? `Continuous siren and SOS vibration sent to ${partnerUser.name}'s phone at full volume.`
+                    ? `Continuous siren and SOS vibration sent to ${partnerDisplayName}'s phone at full volume.`
                     : `${activeEmergencyAlert.senderName} needs you urgently! Your phone is ringing and vibrating.`)}
               </p>
               {!isSender && (
@@ -156,7 +158,7 @@ export const EmergencyAlertModal: React.FC = () => {
                 <span className="font-bold text-emerald-200 block text-sm">Emergency Alert Acknowledged</span>
                 <p className="text-emerald-300 mt-0.5">
                   {isSender
-                    ? `${partnerUser.name} received your SOS and confirmed they are responding!`
+                    ? `${partnerDisplayName} received your SOS and confirmed they are responding!`
                     : `You acknowledged ${activeEmergencyAlert.senderName}'s emergency alert.`}
                 </p>
               </div>
@@ -205,7 +207,7 @@ export const EmergencyAlertModal: React.FC = () => {
                 </div>
                 <div className="truncate">
                   <span className="text-slate-400 text-[10px] uppercase font-bold block">
-                    {isSender ? `${partnerUser.name}'s Connected Phone` : `${activeEmergencyAlert.senderName}'s Phone`}
+                    {isSender ? `${partnerDisplayName}'s Connected Phone` : `${activeEmergencyAlert.senderName}'s Phone`}
                   </span>
                   <span className="font-mono font-bold text-white text-xs">{callerPhone}</span>
                 </div>
@@ -260,7 +262,7 @@ export const EmergencyAlertModal: React.FC = () => {
                   className="w-full py-3.5 px-4 rounded-2xl bg-red-600 hover:bg-red-500 text-white font-extrabold text-sm shadow-lg shadow-red-600/30 transition active:scale-95 flex items-center justify-center gap-2 text-center"
                 >
                   <PhoneCall className="w-5 h-5" />
-                  <span>Call {partnerUser.name} Direct</span>
+                  <span>Call {partnerDisplayName} Direct</span>
                 </a>
               </>
             )}
