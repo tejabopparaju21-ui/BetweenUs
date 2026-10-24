@@ -212,6 +212,9 @@ export const CallModal: React.FC = () => {
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [isSpeakerMuted, setIsSpeakerMuted] = useState(false);
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
+  const [isMirrored, setIsMirrored] = useState(true);
+  const [isFlippingCamera, setIsFlippingCamera] = useState(false);
+  const [cameraToast, setCameraToast] = useState<string | null>(null);
   const [isMinimized, setIsMinimized] = useState(false);
   const [isSwappedViews, setIsSwappedViews] = useState(false);
   const [permissionNotice, setPermissionNotice] = useState<string | null>(null);
@@ -235,6 +238,19 @@ export const CallModal: React.FC = () => {
   const candidateFlushTimeoutRef = useRef<any>(null);
   const queuedRemoteCandidatesRef = useRef<string[]>([]);
   const appliedCandidatesRef = useRef<Set<string>>(new Set());
+  const isFlippingCameraRef = useRef<boolean>(false);
+  const currentDeviceIdRef = useRef<string | null>(null);
+  const cameraToastTimerRef = useRef<any>(null);
+
+  const showCameraToast = useCallback((msg: string) => {
+    if (cameraToastTimerRef.current) {
+      clearTimeout(cameraToastTimerRef.current);
+    }
+    setCameraToast(msg);
+    cameraToastTimerRef.current = setTimeout(() => {
+      setCameraToast(null);
+    }, 2400);
+  }, []);
 
   const mySessionId = useMemo(() => getCallDeviceSessionId(), []);
   const myUid = currentUser?.id || '';
@@ -350,6 +366,12 @@ export const CallModal: React.FC = () => {
     answerCreatedRef.current = false;
     localCandidatesRef.current = [];
     appliedCandidatesRef.current.clear();
+    if (cameraToastTimerRef.current) {
+      clearTimeout(cameraToastTimerRef.current);
+      cameraToastTimerRef.current = null;
+    }
+    isFlippingCameraRef.current = false;
+    setIsFlippingCamera(false);
   }, []);
 
   // Stop any active ringtone
@@ -659,6 +681,17 @@ export const CallModal: React.FC = () => {
 
         localStreamRef.current = stream;
 
+        const initialVideoTrack = stream.getVideoTracks()[0];
+        if (initialVideoTrack) {
+          try {
+            const settings = initialVideoTrack.getSettings?.();
+            if (settings?.deviceId) {
+              currentDeviceIdRef.current = settings.deviceId;
+            }
+          } catch (_) {}
+        }
+        setIsMirrored(facingMode === 'user');
+
         // Attach local preview immediately
         if (localVideoRef.current && mode === 'video' && hasVideo) {
           localVideoRef.current.srcObject = stream;
@@ -865,43 +898,250 @@ export const CallModal: React.FC = () => {
     }
   }, [activeCall?.reaction]);
 
-  // Flip Camera for Mobile
-  const handleFlipCamera = async () => {
-    if (mode !== 'video') return;
-    const nextFacing = facingMode === 'user' ? 'environment' : 'user';
-    setFacingMode(nextFacing);
+  // Robust Camera Flip supporting Mobile (front / rear cameras) and Laptops (multi-camera / mirror perspective)
+  const handleFlipCamera = useCallback(async () => {
+    if (mode !== 'video' || isFlippingCameraRef.current) return;
+    isFlippingCameraRef.current = true;
+    setIsFlippingCamera(true);
 
-    if (localStreamRef.current) {
-      const oldTracks = localStreamRef.current.getVideoTracks();
-      oldTracks.forEach((track) => {
-        track.stop();
-        localStreamRef.current?.removeTrack(track);
-      });
+    try {
+      if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+        showCameraToast('Camera flip not supported on this browser');
+        return;
+      }
 
+      // 1. Enumerate available video inputs
+      let videoDevices: MediaDeviceInfo[] = [];
       try {
-        const newStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: nextFacing }, width: { ideal: 1280 }, height: { ideal: 720 } },
-          audio: false,
-        });
-        const newVideoTrack = newStream.getVideoTracks()[0];
-        if (newVideoTrack && localStreamRef.current) {
-          localStreamRef.current.addTrack(newVideoTrack);
-          if (localVideoRef.current) {
-            localVideoRef.current.srcObject = localStreamRef.current;
-            localVideoRef.current.play().catch(() => {});
-          }
-          if (peerConnectionRef.current) {
-            const sender = peerConnectionRef.current.getSenders().find((s) => s.track?.kind === 'video');
-            if (sender) {
-              sender.replaceTrack(newVideoTrack);
+        if (navigator.mediaDevices.enumerateDevices) {
+          const allDevices = await navigator.mediaDevices.enumerateDevices();
+          videoDevices = allDevices.filter((d) => d.kind === 'videoinput');
+        }
+      } catch (enumErr) {
+        console.warn('Enumerate video devices notice:', enumErr);
+      }
+
+      const currentVideoTrack =
+        localStreamRef.current?.getVideoTracks().find((t) => t.readyState === 'live') ||
+        localStreamRef.current?.getVideoTracks()[0];
+      const currentSettings = currentVideoTrack?.getSettings?.();
+      const activeDeviceId = currentDeviceIdRef.current || currentSettings?.deviceId;
+
+      let newStream: MediaStream | null = null;
+      let targetFacing: 'user' | 'environment' = facingMode === 'user' ? 'environment' : 'user';
+      let chosenDeviceId: string | null = null;
+
+      // 2. Scenario A: Multiple cameras found (Mobile front/rear or Laptop multi-webcam)
+      if (videoDevices.length > 1) {
+        const currentIdx = videoDevices.findIndex((d) => d.deviceId && d.deviceId === activeDeviceId);
+        const nextIdx = currentIdx >= 0 ? (currentIdx + 1) % videoDevices.length : 1;
+        const targetDevice = videoDevices[nextIdx];
+        chosenDeviceId = targetDevice.deviceId;
+
+        const label = (targetDevice.label || '').toLowerCase();
+        const isBack = label.includes('back') || label.includes('rear') || label.includes('environment');
+        const isFront = label.includes('front') || label.includes('user') || label.includes('facetime');
+        if (isBack) {
+          targetFacing = 'environment';
+        } else if (isFront) {
+          targetFacing = 'user';
+        } else {
+          targetFacing = facingMode === 'user' ? 'environment' : 'user';
+        }
+
+        try {
+          newStream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              deviceId: { exact: targetDevice.deviceId },
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+            },
+            audio: false,
+          });
+        } catch (exactErr) {
+          console.debug('Exact deviceId failed, attempting ideal constraint:', exactErr);
+          try {
+            newStream = await navigator.mediaDevices.getUserMedia({
+              video: {
+                deviceId: { ideal: targetDevice.deviceId },
+                width: { ideal: 1280 },
+                height: { ideal: 720 },
+              },
+              audio: false,
+            });
+          } catch (idealErr: any) {
+            console.warn('Ideal deviceId failed:', idealErr);
+            // Some mobile/laptop operating systems only allow 1 camera handle at a time
+            if (idealErr.name === 'NotReadableError' || idealErr.name === 'TrackStartError') {
+              currentVideoTrack?.stop();
+              try {
+                newStream = await navigator.mediaDevices.getUserMedia({
+                  video: {
+                    deviceId: { ideal: targetDevice.deviceId },
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 },
+                  },
+                  audio: false,
+                });
+              } catch (_) {}
             }
           }
         }
-      } catch (err) {
-        console.warn('Camera flip error:', err);
       }
+
+      // 3. Scenario B: Fallback or single device (Laptops with 1 webcam or mobile without device labels)
+      if (!newStream) {
+        const nextFacing = facingMode === 'user' ? 'environment' : 'user';
+        targetFacing = nextFacing;
+
+        try {
+          newStream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              facingMode: { ideal: nextFacing },
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+            },
+            audio: false,
+          });
+        } catch (fErr: any) {
+          console.warn('facingMode constraint failed, checking if release required:', fErr);
+          if (fErr.name === 'NotReadableError' || fErr.name === 'TrackStartError') {
+            currentVideoTrack?.stop();
+            try {
+              newStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: { ideal: nextFacing } },
+                audio: false,
+              });
+            } catch (_) {}
+          }
+        }
+      }
+
+      // 4. Laptop / Desktop Single Webcam Handling:
+      // If the newly acquired track is from the exact same physical camera hardware on a single-camera device,
+      // toggle the mirror perspective so laptop users can switch between selfie mirror & natural view smoothly!
+      const newVideoTrack = newStream?.getVideoTracks()[0];
+      const newSettings = newVideoTrack?.getSettings?.();
+      const newDeviceId = newSettings?.deviceId;
+      const isIdenticalHardware = Boolean(
+        newDeviceId && activeDeviceId && newDeviceId === activeDeviceId
+      );
+
+      if ((!newStream || isIdenticalHardware) && videoDevices.length <= 1) {
+        if (newVideoTrack) {
+          newVideoTrack.stop();
+        }
+        setIsMirrored((prev) => {
+          const next = !prev;
+          showCameraToast(next ? 'Camera Mirrored (Selfie View) 🪞' : 'Camera Unmirrored (Normal View) 📷');
+          return next;
+        });
+        setFacingMode((prev) => (prev === 'user' ? 'environment' : 'user'));
+        return;
+      }
+
+      // 5. Successful Hardware Camera Switch (Mobile rear/front or Laptop alternate camera)
+      if (newVideoTrack) {
+        newVideoTrack.enabled = !isVideoOff;
+
+        // Stop and remove existing video tracks
+        if (localStreamRef.current) {
+          localStreamRef.current.getVideoTracks().forEach((oldTrack) => {
+            try {
+              oldTrack.stop();
+            } catch (_) {}
+            localStreamRef.current?.removeTrack(oldTrack);
+          });
+          localStreamRef.current.addTrack(newVideoTrack);
+        } else {
+          localStreamRef.current = newStream;
+        }
+
+        currentDeviceIdRef.current = newDeviceId || chosenDeviceId || null;
+        setFacingMode(targetFacing);
+        const shouldMirror = targetFacing === 'user';
+        setIsMirrored(shouldMirror);
+
+        // Update local preview immediately
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = localStreamRef.current;
+          localVideoRef.current.play().catch(() => {});
+        }
+
+        // Live WebRTC track replacement without call interruption or renegotiation
+        if (peerConnectionRef.current) {
+          const pc = peerConnectionRef.current;
+          let trackReplaced = false;
+
+          if (typeof pc.getTransceivers === 'function') {
+            const videoTransceiver = pc.getTransceivers().find(
+              (t) =>
+                (t.sender && (t.sender.track?.kind === 'video' || (t.sender as any).track === null)) ||
+                (t.receiver && t.receiver.track?.kind === 'video') ||
+                (t as any).mid === 'video'
+            );
+            if (videoTransceiver && videoTransceiver.sender) {
+              try {
+                await videoTransceiver.sender.replaceTrack(newVideoTrack);
+                trackReplaced = true;
+              } catch (err) {
+                console.warn('replaceTrack on transceiver notice:', err);
+              }
+            }
+          }
+
+          if (!trackReplaced && typeof pc.getSenders === 'function') {
+            const videoSender = pc.getSenders().find(
+              (s) => s.track?.kind === 'video' || (s as any).track === null
+            );
+            if (videoSender) {
+              try {
+                await videoSender.replaceTrack(newVideoTrack);
+                trackReplaced = true;
+              } catch (err) {
+                console.warn('replaceTrack on sender notice:', err);
+              }
+            }
+          }
+        }
+
+        const toastMsg =
+          targetFacing === 'environment'
+            ? 'Switched to Rear Camera 📷'
+            : 'Switched to Front Camera 🤳';
+        showCameraToast(toastMsg);
+      } else {
+        // Fallback if no new video track obtained: toggle mirror perspective
+        setIsMirrored((prev) => {
+          const next = !prev;
+          showCameraToast(next ? 'Camera Mirrored 🪞' : 'Camera Unmirrored 📷');
+          return next;
+        });
+      }
+    } catch (err: any) {
+      console.warn('Camera flip error:', err);
+      // Safeguard: Ensure stream didn't stay empty
+      if (localStreamRef.current && localStreamRef.current.getVideoTracks().length === 0) {
+        try {
+          const recoverStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+          const recoverTrack = recoverStream.getVideoTracks()[0];
+          if (recoverTrack && localStreamRef.current) {
+            recoverTrack.enabled = !isVideoOff;
+            localStreamRef.current.addTrack(recoverTrack);
+            if (localVideoRef.current) {
+              localVideoRef.current.srcObject = localStreamRef.current;
+              localVideoRef.current.play().catch(() => {});
+            }
+          }
+        } catch (_) {}
+      }
+      setIsMirrored((prev) => !prev);
+      showCameraToast('Camera perspective flipped');
+    } finally {
+      isFlippingCameraRef.current = false;
+      setIsFlippingCamera(false);
     }
-  };
+  }, [mode, facingMode, isVideoOff, isMirrored, showCameraToast]);
 
   // Toggle Mute Mic
   const handleToggleMute = useCallback(() => {
@@ -916,7 +1156,7 @@ export const CallModal: React.FC = () => {
     });
   }, []);
 
-  // Keyboard shortcuts for laptop / desktop users (M to mute/unmute, Escape to end/cancel call)
+  // Keyboard shortcuts for laptop / desktop users (M to mute/unmute, F to flip camera, Escape to end/cancel call)
   useEffect(() => {
     if (!activeCall || activeCall.status === 'ended') return;
 
@@ -925,6 +1165,10 @@ export const CallModal: React.FC = () => {
 
       if (e.key === 'm' || e.key === 'M') {
         handleToggleMute();
+      } else if (e.key === 'f' || e.key === 'F') {
+        if (mode === 'video') {
+          handleFlipCamera();
+        }
       } else if (e.key === 'Escape') {
         endActiveCall();
       }
@@ -932,7 +1176,7 @@ export const CallModal: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeCall, endActiveCall, handleToggleMute]);
+  }, [activeCall, endActiveCall, handleToggleMute, handleFlipCamera, mode]);
 
   // Toggle Video Track
   const handleToggleVideo = useCallback(() => {
@@ -1203,6 +1447,13 @@ export const CallModal: React.FC = () => {
 
         {/* Main Stage Area */}
         <div className="relative flex-1 flex flex-col items-center justify-center overflow-hidden">
+          {/* Camera Flip / Mirror Status Toast Notification */}
+          {cameraToast && (
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 px-3.5 py-1.5 rounded-full bg-slate-900/90 border border-rose-400/50 shadow-2xl backdrop-blur-md text-white text-xs font-semibold animate-fade-in flex items-center gap-1.5 pointer-events-none">
+              <span>{cameraToast}</span>
+            </div>
+          )}
+
           {/* ========================================================= */}
           {/* VIDEO CALL MODE */}
           {/* ========================================================= */}
@@ -1298,7 +1549,9 @@ export const CallModal: React.FC = () => {
                     autoPlay
                     playsInline
                     muted
-                    className="w-full h-full object-cover transform -scale-x-100"
+                    className={`w-full h-full object-cover transform transition-transform duration-300 ${
+                      isMirrored ? '-scale-x-100' : 'scale-x-100'
+                    }`}
                   />
                 ) : (
                   <div className="w-full h-full flex flex-col items-center justify-center bg-slate-900 text-slate-400 p-2 text-center">
@@ -1447,11 +1700,16 @@ export const CallModal: React.FC = () => {
           {mode === 'video' ? (
             <button
               onClick={handleFlipCamera}
-              className="w-12 h-12 rounded-2xl bg-white/10 hover:bg-white/20 text-white flex flex-col items-center justify-center transition active:scale-90 cursor-pointer"
-              title="Flip camera (front / rear)"
+              disabled={isFlippingCamera}
+              className={`w-12 h-12 rounded-2xl flex flex-col items-center justify-center transition active:scale-90 cursor-pointer ${
+                isFlippingCamera
+                  ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                  : 'bg-white/10 hover:bg-white/20 text-white'
+              }`}
+              title="Flip camera (front / rear / mirror - shortcut 'F')"
             >
-              <RotateCcw className="w-5 h-5" />
-              <span className="text-[9px] mt-0.5 font-medium">Flip</span>
+              <RotateCcw className={`w-5 h-5 transition-transform duration-500 ${isFlippingCamera ? 'rotate-180 animate-spin' : ''}`} />
+              <span className="text-[9px] mt-0.5 font-medium">{isFlippingCamera ? 'Flipping...' : 'Flip'}</span>
             </button>
           ) : (
             <button
