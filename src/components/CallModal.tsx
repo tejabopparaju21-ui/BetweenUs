@@ -212,6 +212,8 @@ export const CallModal: React.FC = () => {
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [isSpeakerMuted, setIsSpeakerMuted] = useState(false);
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
+  const facingModeRef = useRef<'user' | 'environment'>('user');
+  facingModeRef.current = facingMode;
   const [isMirrored, setIsMirrored] = useState(true);
   const [isFlippingCamera, setIsFlippingCamera] = useState(false);
   const [cameraToast, setCameraToast] = useState<string | null>(null);
@@ -662,7 +664,7 @@ export const CallModal: React.FC = () => {
 
     const setupMediaAndWebRTC = async () => {
       try {
-        const { stream, hasAudio, hasVideo, notice } = await acquireCallMedia(mode, facingMode);
+        const { stream, hasAudio, hasVideo, notice } = await acquireCallMedia(mode, facingModeRef.current);
 
         if (isCancelled) {
           stream.getTracks().forEach((t) => t.stop());
@@ -858,7 +860,7 @@ export const CallModal: React.FC = () => {
     return () => {
       isCancelled = true;
     };
-  }, [activeCall?.id, activeCall?.status, mode, isCaller, facingMode, queueLocalCandidate, processSignaling, attachRemoteStream]);
+  }, [activeCall?.id, activeCall?.status, mode, isCaller, queueLocalCandidate, processSignaling, attachRemoteStream]);
 
   // -------------------------------------------------------------
   // 4. WebRTC Signaling Exchanges (Offer -> Answer -> Remote ICE)
@@ -901,6 +903,11 @@ export const CallModal: React.FC = () => {
   // Robust Camera Flip supporting Mobile (front / rear cameras) and Laptops (multi-camera / mirror perspective)
   const handleFlipCamera = useCallback(async () => {
     if (mode !== 'video' || isFlippingCameraRef.current) return;
+    if (isVideoOff) {
+      showCameraToast('Turn on camera to flip 📷');
+      return;
+    }
+
     isFlippingCameraRef.current = true;
     setIsFlippingCamera(true);
 
@@ -909,6 +916,8 @@ export const CallModal: React.FC = () => {
         showCameraToast('Camera flip not supported on this browser');
         return;
       }
+
+      const nextFacing: 'user' | 'environment' = facingModeRef.current === 'user' ? 'environment' : 'user';
 
       // 1. Enumerate available video inputs
       let videoDevices: MediaDeviceInfo[] = [];
@@ -921,227 +930,283 @@ export const CallModal: React.FC = () => {
         console.warn('Enumerate video devices notice:', enumErr);
       }
 
+      // Filter out IR, depth, and virtual sensor stubs that fail or lock up drivers
+      const usableCameras = videoDevices.filter((d) => {
+        const lbl = (d.label || '').toLowerCase();
+        return !lbl.includes('ir ') && !lbl.includes('infrared') && !lbl.includes('depth');
+      });
+      const cameraPool = usableCameras.length > 0 ? usableCameras : videoDevices;
+
       const currentVideoTrack =
         localStreamRef.current?.getVideoTracks().find((t) => t.readyState === 'live') ||
         localStreamRef.current?.getVideoTracks()[0];
       const currentSettings = currentVideoTrack?.getSettings?.();
       const activeDeviceId = currentDeviceIdRef.current || currentSettings?.deviceId;
 
-      let newStream: MediaStream | null = null;
-      let targetFacing: 'user' | 'environment' = facingMode === 'user' ? 'environment' : 'user';
-      let chosenDeviceId: string | null = null;
-
-      // 2. Scenario A: Multiple cameras found (Mobile front/rear or Laptop multi-webcam)
-      if (videoDevices.length > 1) {
-        const currentIdx = videoDevices.findIndex((d) => d.deviceId && d.deviceId === activeDeviceId);
-        const nextIdx = currentIdx >= 0 ? (currentIdx + 1) % videoDevices.length : 1;
-        const targetDevice = videoDevices[nextIdx];
-        chosenDeviceId = targetDevice.deviceId;
-
-        const label = (targetDevice.label || '').toLowerCase();
-        const isBack = label.includes('back') || label.includes('rear') || label.includes('environment');
-        const isFront = label.includes('front') || label.includes('user') || label.includes('facetime');
-        if (isBack) {
-          targetFacing = 'environment';
-        } else if (isFront) {
-          targetFacing = 'user';
+      // Check if device has multiple physical cameras
+      let targetCameraDevice: MediaDeviceInfo | null = null;
+      if (cameraPool.length > 1) {
+        if (nextFacing === 'environment') {
+          targetCameraDevice = cameraPool.find((d) => {
+            const l = (d.label || '').toLowerCase();
+            return (l.includes('back') || l.includes('rear') || l.includes('environment')) && d.deviceId !== activeDeviceId;
+          }) || null;
         } else {
-          targetFacing = facingMode === 'user' ? 'environment' : 'user';
+          targetCameraDevice = cameraPool.find((d) => {
+            const l = (d.label || '').toLowerCase();
+            return (l.includes('front') || l.includes('user') || l.includes('facetime')) && d.deviceId !== activeDeviceId;
+          }) || null;
         }
 
-        try {
-          newStream = await navigator.mediaDevices.getUserMedia({
-            video: {
-              deviceId: { exact: targetDevice.deviceId },
-              width: { ideal: 1280 },
-              height: { ideal: 720 },
-            },
-            audio: false,
-          });
-        } catch (exactErr) {
-          console.debug('Exact deviceId failed, attempting ideal constraint:', exactErr);
-          try {
-            newStream = await navigator.mediaDevices.getUserMedia({
-              video: {
-                deviceId: { ideal: targetDevice.deviceId },
-                width: { ideal: 1280 },
-                height: { ideal: 720 },
-              },
-              audio: false,
-            });
-          } catch (idealErr: any) {
-            console.warn('Ideal deviceId failed:', idealErr);
-            // Some mobile/laptop operating systems only allow 1 camera handle at a time
-            if (idealErr.name === 'NotReadableError' || idealErr.name === 'TrackStartError') {
-              currentVideoTrack?.stop();
-              try {
-                newStream = await navigator.mediaDevices.getUserMedia({
-                  video: {
-                    deviceId: { ideal: targetDevice.deviceId },
-                    width: { ideal: 1280 },
-                    height: { ideal: 720 },
-                  },
-                  audio: false,
-                });
-              } catch (_) {}
-            }
+        // If labels are generic or masked by browser privacy, pick any different device
+        if (!targetCameraDevice) {
+          const altCameras = cameraPool.filter((d) => d.deviceId && d.deviceId !== activeDeviceId);
+          if (altCameras.length > 0) {
+            targetCameraDevice = altCameras[0];
           }
         }
       }
 
-      // 3. Scenario B: Fallback or single device (Laptops with 1 webcam or mobile without device labels)
-      if (!newStream) {
-        const nextFacing = facingMode === 'user' ? 'environment' : 'user';
-        targetFacing = nextFacing;
-
-        try {
-          newStream = await navigator.mediaDevices.getUserMedia({
-            video: {
-              facingMode: { ideal: nextFacing },
-              width: { ideal: 1280 },
-              height: { ideal: 720 },
-            },
-            audio: false,
-          });
-        } catch (fErr: any) {
-          console.warn('facingMode constraint failed, checking if release required:', fErr);
-          if (fErr.name === 'NotReadableError' || fErr.name === 'TrackStartError') {
-            currentVideoTrack?.stop();
-            try {
-              newStream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: { ideal: nextFacing } },
-                audio: false,
-              });
-            } catch (_) {}
-          }
-        }
-      }
-
-      // 4. Laptop / Desktop Single Webcam Handling:
-      // If the newly acquired track is from the exact same physical camera hardware on a single-camera device,
-      // toggle the mirror perspective so laptop users can switch between selfie mirror & natural view smoothly!
-      const newVideoTrack = newStream?.getVideoTracks()[0];
-      const newSettings = newVideoTrack?.getSettings?.();
-      const newDeviceId = newSettings?.deviceId;
-      const isIdenticalHardware = Boolean(
-        newDeviceId && activeDeviceId && newDeviceId === activeDeviceId
-      );
-
-      if ((!newStream || isIdenticalHardware) && videoDevices.length <= 1) {
-        if (newVideoTrack) {
-          newVideoTrack.stop();
-        }
+      // Single Webcam / Laptop Handling:
+      // If there's only 1 camera (or no distinct alternate camera found), smoothly toggle perspective (Mirrored / Normal)
+      // without stopping or restarting hardware, completely preventing any camera freeze!
+      const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
+      if (cameraPool.length <= 1 || (!targetCameraDevice && !isMobile)) {
+        facingModeRef.current = nextFacing;
+        setFacingMode(nextFacing);
         setIsMirrored((prev) => {
           const next = !prev;
           showCameraToast(next ? 'Camera Mirrored (Selfie View) 🪞' : 'Camera Unmirrored (Normal View) 📷');
           return next;
         });
-        setFacingMode((prev) => (prev === 'user' ? 'environment' : 'user'));
         return;
       }
 
-      // 5. Successful Hardware Camera Switch (Mobile rear/front or Laptop alternate camera)
-      if (newVideoTrack) {
-        newVideoTrack.enabled = !isVideoOff;
+      // 2. Hardware Camera Switch (Mobile front/rear or laptop alternate webcam)
+      let newStream: MediaStream | null = null;
+      const targetFacing: 'user' | 'environment' = nextFacing;
 
-        // Stop and remove existing video tracks
-        if (localStreamRef.current) {
-          localStreamRef.current.getVideoTracks().forEach((oldTrack) => {
-            try {
-              oldTrack.stop();
-            } catch (_) {}
-            localStreamRef.current?.removeTrack(oldTrack);
-          });
-          localStreamRef.current.addTrack(newVideoTrack);
-        } else {
-          localStreamRef.current = newStream;
-        }
+      const constraintCandidates: MediaStreamConstraints[] = [];
 
-        currentDeviceIdRef.current = newDeviceId || chosenDeviceId || null;
-        setFacingMode(targetFacing);
-        const shouldMirror = targetFacing === 'user';
-        setIsMirrored(shouldMirror);
-
-        // Update local preview immediately
-        if (localVideoRef.current) {
-          localVideoRef.current.srcObject = localStreamRef.current;
-          localVideoRef.current.play().catch(() => {});
-        }
-
-        // Live WebRTC track replacement without call interruption or renegotiation
-        if (peerConnectionRef.current) {
-          const pc = peerConnectionRef.current;
-          let trackReplaced = false;
-
-          if (typeof pc.getTransceivers === 'function') {
-            const videoTransceiver = pc.getTransceivers().find(
-              (t) =>
-                (t.sender && (t.sender.track?.kind === 'video' || (t.sender as any).track === null)) ||
-                (t.receiver && t.receiver.track?.kind === 'video') ||
-                (t as any).mid === 'video'
-            );
-            if (videoTransceiver && videoTransceiver.sender) {
-              try {
-                await videoTransceiver.sender.replaceTrack(newVideoTrack);
-                trackReplaced = true;
-              } catch (err) {
-                console.warn('replaceTrack on transceiver notice:', err);
-              }
-            }
-          }
-
-          if (!trackReplaced && typeof pc.getSenders === 'function') {
-            const videoSender = pc.getSenders().find(
-              (s) => s.track?.kind === 'video' || (s as any).track === null
-            );
-            if (videoSender) {
-              try {
-                await videoSender.replaceTrack(newVideoTrack);
-                trackReplaced = true;
-              } catch (err) {
-                console.warn('replaceTrack on sender notice:', err);
-              }
-            }
-          }
-        }
-
-        const toastMsg =
-          targetFacing === 'environment'
-            ? 'Switched to Rear Camera 📷'
-            : 'Switched to Front Camera 🤳';
-        showCameraToast(toastMsg);
-      } else {
-        // Fallback if no new video track obtained: toggle mirror perspective
-        setIsMirrored((prev) => {
-          const next = !prev;
-          showCameraToast(next ? 'Camera Mirrored 🪞' : 'Camera Unmirrored 📷');
-          return next;
+      if (targetCameraDevice?.deviceId) {
+        constraintCandidates.push({
+          video: {
+            deviceId: { exact: targetCameraDevice.deviceId },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+          audio: false,
+        });
+        constraintCandidates.push({
+          video: {
+            deviceId: { ideal: targetCameraDevice.deviceId },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+          audio: false,
         });
       }
+
+      constraintCandidates.push({
+        video: {
+          facingMode: { exact: nextFacing },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+        audio: false,
+      });
+
+      constraintCandidates.push({
+        video: {
+          facingMode: { ideal: nextFacing },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+        audio: false,
+      });
+
+      // Try acquiring new stream. If hardware camera is locked exclusively by OS, release old track and retry.
+      for (const constraints of constraintCandidates) {
+        try {
+          newStream = await navigator.mediaDevices.getUserMedia(constraints);
+          if (newStream && newStream.getVideoTracks().length > 0) {
+            break;
+          }
+        } catch (attemptErr: any) {
+          if (
+            (attemptErr.name === 'NotReadableError' ||
+             attemptErr.name === 'TrackStartError' ||
+             attemptErr.name === 'AbortError') &&
+            currentVideoTrack && currentVideoTrack.readyState === 'live'
+          ) {
+            try { currentVideoTrack.stop(); } catch (_) {}
+            try {
+              newStream = await navigator.mediaDevices.getUserMedia(constraints);
+              if (newStream && newStream.getVideoTracks().length > 0) {
+                break;
+              }
+            } catch (_) {}
+          }
+        }
+      }
+
+      const newVideoTrack =
+        newStream?.getVideoTracks().find((t) => t.readyState === 'live') ||
+        newStream?.getVideoTracks()[0];
+
+      // If new track could not be obtained:
+      if (!newVideoTrack) {
+        // Recover original camera if stopped
+        if (!currentVideoTrack || currentVideoTrack.readyState === 'ended') {
+          try {
+            const recoverStream = await navigator.mediaDevices.getUserMedia({
+              video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+              audio: false,
+            });
+            const recoverTrack = recoverStream.getVideoTracks()[0];
+            if (recoverTrack) {
+              const audioTracks = localStreamRef.current ? localStreamRef.current.getAudioTracks() : [];
+              const recoveredStream = new MediaStream([recoverTrack, ...audioTracks]);
+              localStreamRef.current = recoveredStream;
+              if (localVideoRef.current) {
+                localVideoRef.current.srcObject = null;
+                localVideoRef.current.srcObject = recoveredStream;
+                localVideoRef.current.play().catch(() => {});
+              }
+              if (peerConnectionRef.current) {
+                const videoSender = peerConnectionRef.current.getSenders().find(
+                  (s) => s.track?.kind === 'video' || (s as any).track === null
+                );
+                if (videoSender) {
+                  videoSender.replaceTrack(recoverTrack).catch(() => {});
+                }
+              }
+            }
+          } catch (_) {}
+        }
+
+        // Toggle mirror perspective as smooth fallback
+        facingModeRef.current = nextFacing;
+        setFacingMode(nextFacing);
+        setIsMirrored((prev) => {
+          const next = !prev;
+          showCameraToast(next ? 'Camera Mirrored (Selfie View) 🪞' : 'Camera Unmirrored (Normal View) 📷');
+          return next;
+        });
+        return;
+      }
+
+      // SUCCESSFUL NEW CAMERA TRACK:
+      newVideoTrack.enabled = !isVideoOff;
+
+      // 1. Replace track in WebRTC peer connection immediately
+      if (peerConnectionRef.current) {
+        const pc = peerConnectionRef.current;
+        let trackReplaced = false;
+
+        if (typeof pc.getSenders === 'function') {
+          const videoSender = pc.getSenders().find(
+            (s) => s.track?.kind === 'video' || (s as any).track === null
+          );
+          if (videoSender) {
+            try {
+              await videoSender.replaceTrack(newVideoTrack);
+              trackReplaced = true;
+            } catch (err) {
+              console.warn('replaceTrack on sender notice:', err);
+            }
+          }
+        }
+
+        if (!trackReplaced && typeof pc.getTransceivers === 'function') {
+          const videoTransceiver = pc.getTransceivers().find(
+            (t) =>
+              (t.sender && (t.sender.track?.kind === 'video' || (t.sender as any).track === null)) ||
+              (t.receiver && t.receiver.track?.kind === 'video') ||
+              (t as any).mid === 'video'
+          );
+          if (videoTransceiver && videoTransceiver.sender) {
+            try {
+              await videoTransceiver.sender.replaceTrack(newVideoTrack);
+              trackReplaced = true;
+            } catch (err) {
+              console.warn('replaceTrack on transceiver notice:', err);
+            }
+          }
+        }
+      }
+
+      // 2. Stop old video tracks
+      if (localStreamRef.current) {
+        localStreamRef.current.getVideoTracks().forEach((oldTrack) => {
+          if (oldTrack !== newVideoTrack) {
+            try { oldTrack.stop(); } catch (_) {}
+          }
+        });
+      }
+
+      // 3. Keep audio tracks intact and construct a fresh MediaStream
+      const audioTracks = localStreamRef.current ? localStreamRef.current.getAudioTracks() : [];
+      const updatedStream = new MediaStream([newVideoTrack, ...audioTracks]);
+      localStreamRef.current = updatedStream;
+
+      const newSettings = newVideoTrack.getSettings?.();
+      currentDeviceIdRef.current = newSettings?.deviceId || targetCameraDevice?.deviceId || null;
+      const resolvedFacing = (newSettings?.facingMode as 'user' | 'environment') || targetFacing;
+      facingModeRef.current = resolvedFacing;
+      setFacingMode(resolvedFacing);
+      setIsMirrored(resolvedFacing === 'user');
+
+      // 4. Update local video preview (flush and rebind to fresh stream)
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = null;
+        localVideoRef.current.srcObject = updatedStream;
+        localVideoRef.current.play().catch(() => {});
+      }
+
+      const toastMsg =
+        resolvedFacing === 'environment'
+          ? 'Switched to Rear Camera 📷'
+          : 'Switched to Front Camera 🤳';
+      showCameraToast(toastMsg);
     } catch (err: any) {
       console.warn('Camera flip error:', err);
-      // Safeguard: Ensure stream didn't stay empty
-      if (localStreamRef.current && localStreamRef.current.getVideoTracks().length === 0) {
+
+      // Final safeguard: if camera track was stopped and is dead, recover it
+      const liveTrack = localStreamRef.current?.getVideoTracks().find((t) => t.readyState === 'live');
+      if (!liveTrack) {
         try {
           const recoverStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
           const recoverTrack = recoverStream.getVideoTracks()[0];
-          if (recoverTrack && localStreamRef.current) {
+          if (recoverTrack) {
             recoverTrack.enabled = !isVideoOff;
-            localStreamRef.current.addTrack(recoverTrack);
+            const audioTracks = localStreamRef.current ? localStreamRef.current.getAudioTracks() : [];
+            const recoveredStream = new MediaStream([recoverTrack, ...audioTracks]);
+            localStreamRef.current = recoveredStream;
             if (localVideoRef.current) {
-              localVideoRef.current.srcObject = localStreamRef.current;
+              localVideoRef.current.srcObject = null;
+              localVideoRef.current.srcObject = recoveredStream;
               localVideoRef.current.play().catch(() => {});
+            }
+            if (peerConnectionRef.current) {
+              const videoSender = peerConnectionRef.current.getSenders().find(
+                (s) => s.track?.kind === 'video' || (s as any).track === null
+              );
+              if (videoSender) {
+                videoSender.replaceTrack(recoverTrack).catch(() => {});
+              }
             }
           }
         } catch (_) {}
       }
+
       setIsMirrored((prev) => !prev);
       showCameraToast('Camera perspective flipped');
     } finally {
       isFlippingCameraRef.current = false;
       setIsFlippingCamera(false);
     }
-  }, [mode, facingMode, isVideoOff, isMirrored, showCameraToast]);
+  }, [mode, isVideoOff, showCameraToast]);
 
   // Toggle Mute Mic
   const handleToggleMute = useCallback(() => {
